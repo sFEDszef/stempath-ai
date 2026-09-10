@@ -13,12 +13,14 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open http://localhost:3000. For a production preview:
+Open http://localhost:3000. For a production static preview:
 
 ```sh
 pnpm build
 pnpm start
 ```
+
+The production preview opens at http://127.0.0.1:3000/stempath-ai/. `pnpm start` serves only the exported files; it does not run a Next.js backend.
 
 `pnpm typecheck` checks TypeScript independently.
 
@@ -50,8 +52,25 @@ The mock intentionally asks learners to predict, explain, compare, and evaluate 
 
 Chats, completion, support level, and images are session-only and reset on page reload. Notes persist only in the current browser. Nothing is sent to a research database. Do not treat this MVP as a data collection instrument. A future study will need its own consent, storage, access, and retention design. Fonts use Google Fonts with local system fallbacks.
 
-## Vercel readiness
+## GitHub Pages deployment
 
-Import this repository into Vercel, select the Next.js framework preset, and leave the root directory at the repository root. Use `pnpm install --frozen-lockfile` and `pnpm build`. No environment variables or provider accounts are required for this mock version. No deployment has been performed.
+Repository: `sFEDszef/stempath-ai`  
+Expected public URL: https://sfedszef.github.io/stempath-ai/
 
-Next.js installation reference: https://nextjs.org/docs/app/getting-started/installation
+The production build uses `output: "export"`, `basePath: "/stempath-ai"`, matching `assetPrefix`, trailing slashes, and unoptimized images. `pnpm build` writes the deployable site to `out/`. Development remains at the domain root. There is no server-side AI or image optimizer.
+
+`.github/workflows/deploy-pages.yml` installs the pinned dependencies, builds the export, uploads `out/`, and deploys on every push to `main`. It also supports manual runs. Only the deployment job has Pages and OIDC write permissions. No personal access token or API key is needed.
+
+### One-time repository settings
+
+1. Open **Settings → Pages → Build and deployment** and choose **GitHub Actions** as the source. Do not choose a branch or a `/docs` folder.
+2. If Actions are disabled or restricted, enable them under **Settings → Actions → General**, allowing the official `actions/*` actions and `pnpm/action-setup` used in this workflow.
+3. If environment protection is configured, allow `main` to deploy to the `github-pages` environment and approve any required deployment review.
+4. This repository is private. GitHub Free requires a public repository for Pages. Either change its visibility to public under **Settings → General → Danger Zone**, or keep it private with a plan that supports private-repository Pages. Publishing the website does not by itself require publishing the source when your plan supports private repositories.
+5. After enabling Pages, open **Actions → Deploy STEMPath AI to GitHub Pages → Run workflow**, selecting `main`. Future pushes deploy automatically. Leave the custom domain blank for the URL above; keep HTTPS enforcement enabled.
+
+The current UI uses local blob URLs for uploaded images and a CSS challenge illustration, so neither needs a base-path rewrite. Generated JS and CSS use the configured project prefix. Future files added to `public/` must be referenced with `/stempath-ai/` in production. Future routes must also be compatible with static export.
+
+Chats, notes, uploads, and stage behavior remain unchanged. Google Fonts uses HTTPS and has system fallbacks. Deploying changes the browser origin, so notes saved on localhost do not transfer to the public site.
+
+References: [Next.js static export](https://nextjs.org/docs/app/guides/static-exports), [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
