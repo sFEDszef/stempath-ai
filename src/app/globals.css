@@ -359,7 +359,7 @@ h1 {
   font-size: 8px;
   color: #7698a4;
 }
-.car-placeholder {
+.demo-illustration {
   position: absolute;
   left: 60px;
   top: 30px;
@@ -367,7 +367,7 @@ h1 {
   height: 105px;
   transform: rotate(-5deg);
 }
-.sail {
+.demo-panel {
   position: absolute;
   left: 42px;
   top: 0;
@@ -377,7 +377,7 @@ h1 {
   clip-path: polygon(0 0, 100% 91%, 0 100%);
   border-left: 3px solid #537b8b;
 }
-.car-base {
+.demo-base {
   position: absolute;
   left: 8px;
   top: 67px;
@@ -1132,7 +1132,7 @@ dialog::backdrop {
     width: 126px;
     height: 158px;
   }
-  .car-placeholder {
+  .demo-illustration {
     left: 25px;
   }
   .challenge-image > svg {
@@ -1212,7 +1212,7 @@ dialog::backdrop {
   .challenge-image {
     width: 165px;
   }
-  .car-placeholder {
+  .demo-illustration {
     left: 50px;
   }
   .header .brand {
@@ -1327,7 +1327,7 @@ dialog::backdrop {
     height: 139px;
     margin-top: 6px;
   }
-  .car-placeholder {
+  .demo-illustration {
     transform: scale(0.7) rotate(-5deg);
     transform-origin: left top;
     left: 15px;
@@ -1664,3 +1664,11 @@ dialog::backdrop {
     width: 36px;
   }
 }
+
+/* v0.3: reuse existing workspace cards, spacing and accent colours. */
+.coach-mode{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0;color:#617580;font-size:12px}
+.coach-mode select,.task-loader input,.task-loader textarea,.task-loader select,.learning-artifacts textarea{font:inherit;border:1px solid #dce7e9;border-radius:8px;background:white;padding:9px;color:#254452;max-width:100%}
+.task-loader form{display:grid;gap:13px}.task-loader label,.learning-artifacts label{display:grid;gap:6px;font-size:12px;margin-top:12px}.task-loader textarea{min-height:76px}.task-loader h3{margin-top:22px}.task-loader p,.learning-artifacts p,.ai-challenge p,.fading p{font-size:12px;line-height:1.6;color:#536e7a}
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.demo-grid button{border:1px solid #dce7e9;border-radius:9px;padding:12px;text-align:left;background:#f5fafb;color:#254452}.demo-grid small{display:block;margin-top:5px;color:#647d88;font-size:10px}
+.learning-artifacts summary,.ai-challenge summary{cursor:pointer;font-size:14px;font-weight:600;color:#254452}.learning-artifacts textarea{width:100%;resize:vertical;min-height:62px}.claim-choices{display:flex;gap:6px;flex-wrap:wrap}.claim-choices button,.fading button{font-size:11px;border:1px solid #b9d9d8;background:#eff8f6;border-radius:7px;padding:7px;margin:4px 0;color:#315f60}.claim-choices button[aria-pressed=true]{background:#d0eae4}.fading small,.ai-challenge small{font-size:10px;color:#637d84;display:block}.fading button{margin-right:5px}.next-stage{margin-top:12px}.workspace-loading{padding:40px}.breadcrumb{flex-wrap:wrap}.challenge-copy{min-width:0}.challenge-copy h1{overflow-wrap:anywhere}.challenge-copy p{overflow-wrap:anywhere}.task-loader{max-height:70vh;overflow:auto}.learning-artifacts,.ai-challenge{margin-top:18px}
+@media(max-width:700px){.demo-grid{grid-template-columns:1fr}.coach-mode{align-items:flex-start}.task-loader{max-height:65vh}}

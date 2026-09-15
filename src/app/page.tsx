@@ -1,4 +1,2 @@
-import Workspace from "@/components/Workspace";
-export default function Page() {
-  return <Workspace />;
-}
+import TaskWorkspace from "@/components/TaskWorkspace";
+export default function Page(){return <TaskWorkspace/>;}
