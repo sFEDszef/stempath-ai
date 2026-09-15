@@ -16,9 +16,9 @@ export function ArtifactUploader({
         <ImagePlus size={25} />
         <strong>Upload image</strong>
         <span>
-          Upload your design sketch,
+          Upload your sketch, setup,
           <br />
-          experiment process or prototype.
+          observations or results.
         </span>
         <small>PNG, JPG or WebP · Up to 5 MB</small>
       </button>

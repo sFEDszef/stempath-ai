@@ -4,6 +4,7 @@ import { ChatMessage } from "./ChatMessage";
 import { supportLabels } from "@/data/challenge";
 import type { Message, Stage, SupportLevel } from "@/types";
 export function AIChat({
+  mode,
   stage,
   level,
   messages,
@@ -13,7 +14,12 @@ export function AIChat({
   onComplete,
   complete,
   onLevel,
+  error,
+  onRetry,
 }: {
+  mode?: "ai"|"demo";
+  error?: {message:string; retryable:boolean};
+  onRetry: () => void;
   stage: Stage;
   level: SupportLevel;
   messages: Message[];
@@ -27,15 +33,16 @@ export function AIChat({
   const [input, setInput] = useState("");
   const log = useRef<HTMLDivElement>(null);
   const previous = useRef(messages.length);
+  useEffect(()=>setInput(""),[stage.id]);
   useEffect(() => {
-    if (previous.current !== messages.length) {
+    if (previous.current !== messages.length || error || busy) {
       log.current?.scrollTo({
         top: log.current.scrollHeight,
         behavior: "smooth",
       });
       previous.current = messages.length;
     }
-  }, [messages.length]);
+  }, [messages.length, error, busy]);
   function submit() {
     if (input.trim() && !busy) {
       onSend(input.trim());
@@ -55,7 +62,7 @@ export function AIChat({
           </div>
         </div>
         <span className="mock-badge">
-          <i /> Mock AI
+          <i /> {mode === "ai" ? "OpenAI" : mode === "demo" ? "Demo" : "Auto"}
         </span>
       </div>
       <div className="chat-context">
@@ -101,6 +108,7 @@ export function AIChat({
             <Sparkles size={15} /> Your coach is thinking<span>•••</span>
           </div>
         )}
+        {error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{error.message}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>Retry / 重试</button></div>}</div></div>}
       </div>
       <div className="composer-area">
         <form

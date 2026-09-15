@@ -6,7 +6,7 @@ import {
   X,
   ArrowRight,
   BookOpen,
-  Wind,
+  Compass,
   FlaskConical,
   Save,
 } from "lucide-react";
@@ -17,16 +17,33 @@ import { AIChat } from "./AIChat";
 import { STEMJourney } from "./STEMJourney";
 import { ArtifactUploader } from "./ArtifactUploader";
 import { HelpMeter } from "./HelpMeter";
-import { initialMessages, stages } from "@/data/challenge";
-import { mockCoach } from "@/lib/coach";
-import type { Artifact, Message, StageId, SupportLevel } from "@/types";
-export default function Workspace() {
+import { taskStorageKey } from "@/lib/stem/tasks";
+import { demoTasks } from "@/data/tasks";
+import { getStages, keyQuestions, pedagogy } from "@/lib/stem/stages";
+import { parseArtifacts } from "@/lib/stem/validation";
+import { canSuggestFading } from "@/lib/stem/fading";
+import { LearningArtifacts } from "./LearningArtifacts";
+import { AIChallenge } from "./AIChallenge";
+import { apiCoach, CoachError } from "@/lib/coach";
+import type { Artifact, Message, StageId, SupportLevel, ChatRequest, STEMTask, LearningArtifacts as Thinking } from "@/types";
+export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()=>void}) {
+  const stages=getStages(task);
+  const [records,setRecords]=useState<Thinking>({});
+  const [restored,setRestored]=useState(false);
+  const [mode,setMode]=useState<'auto'|'demo'>('auto');
+  const [responseMode,setResponseMode]=useState<'ai'|'demo'|undefined>();
+  const [dismissed,setDismissed]=useState<string[]>([]);
+  const alive=useRef(true);
+  useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
+
   const [active, setActive] = useState<StageId>("understand");
   const [completed, setCompleted] = useState<StageId[]>([]);
   const [level, setLevel] = useState<SupportLevel>(1);
   const [conversations, setConversations] = useState<
     Partial<Record<StageId, Message[]>>
-  >({ understand: initialMessages });
+  >({ understand: [{id:'welcome',role:'assistant',text:`Let’s explore “${task.title}”. ${pedagogy.understand.questions[0]}
+
+用你喜欢的语言表达你的想法。`,suggestions:pedagogy.understand.replies}] });
   const [pending, setPending] = useState<StageId[]>([]);
   const pendingRef = useRef(new Set<StageId>());
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -35,16 +52,30 @@ export default function Workspace() {
   const [modal, setModal] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saved, setSaved] = useState(false);
+  const [chatErrors, setChatErrors] = useState<Partial<Record<StageId, {message:string; retryable:boolean; request:ChatRequest}>>>({});
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
-  const messages = conversations[active] ?? [];
+  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`For “${task.title}”, let’s explore ${stage.title}. ${stage.prompts[level-1]}`,suggestions:pedagogy[active].replies}];
   useEffect(() => {
     try {
-      setNote(localStorage.getItem("stempath-notebook-v1") ?? "");
-    } catch {}
+      const raw=sessionStorage.getItem('stempath-progress-v3');
+      if(raw){const data=JSON.parse(raw);if(data.task===JSON.stringify(task)){
+        setRecords(parseArtifacts(data.records));
+        if(Array.isArray(data.completed)&&data.completed.every((id:unknown)=>stages.some(s=>s.id===id)))setCompleted([...new Set<StageId>(data.completed)]);
+        if(stages.some(s=>s.id===data.active))setActive(data.active);
+        if([1,2,3].includes(data.level))setLevel(data.level);
+      }}
+      setNote(localStorage.getItem(`stempath-notebook-v3-${taskStorageKey(task)}`) ?? (task.id===demoTasks[0].id?localStorage.getItem("stempath-notebook-v1"):null) ?? "");
+    } catch {
+      // Storage may be unavailable; the notebook remains usable in memory.
+    }
+    setRestored(true);
     return () => artifactRef.current.forEach((a) => URL.revokeObjectURL(a.url));
+  // TaskWorkspace remounts this workspace for every loaded task.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  useEffect(()=>{if(!restored)return;try{sessionStorage.setItem('stempath-progress-v3',JSON.stringify({task:JSON.stringify(task),records,completed,active,level}));}catch{setError('Progress could not be saved. Keep this tab open or copy your notes.')}},[task,records,completed,active,level,restored]);
   useEffect(() => {
     if (modal) dialog.current?.showModal();
     else dialog.current?.close();
@@ -60,44 +91,43 @@ export default function Workspace() {
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                text: `Let’s explore the ${stages.find((s) => s.id === id)!.title} stage.\n\n${stages.find((s) => s.id === id)!.prompts[level - 1]}`,
-                suggestions: ["我不确定。", "你能给我一些提示吗？"],
+                text: `For “${task.title}”, let’s explore ${stages.find((s) => s.id === id)!.title}.\n\n${stages.find((s) => s.id === id)!.prompts[level - 1]}`,
+                suggestions: pedagogy[id].replies,
               },
             ],
           },
     );
   }
-  async function send(text: string) {
-    if (!text.trim() || pendingRef.current.has(active)) return;
-    const requestStage = active;
+  async function deliver(request: ChatRequest) {
+    const requestStage = request.stage;
+    if (pendingRef.current.has(requestStage)) return;
     pendingRef.current.add(requestStage);
-    setPending((prev) => [...prev, requestStage]);
-    const next = [
-      ...messages,
-      { id: crypto.randomUUID(), role: "student" as const, text: text.trim() },
-    ];
-    setConversations((prev) => ({ ...prev, [requestStage]: next }));
+    setPending(prev => [...prev, requestStage]);
+    setChatErrors(prev => ({...prev, [requestStage]:undefined}));
     try {
-      const response = await mockCoach.respond({
-        stage: requestStage,
-        level,
-        messages: next,
-      });
-      setConversations((prev) => ({
-        ...prev,
-        [requestStage]: [
-          ...(prev[requestStage] ?? []),
-          { id: crypto.randomUUID(), role: "assistant", ...response },
-        ],
-      }));
-    } catch {
-      setError(
-        "The coach could not respond. Please try sending your idea again.",
-      );
+      const response = await apiCoach.respond(request);
+      if(!alive.current)return;
+      setResponseMode(response.mode);
+      setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response}]}));
+    } catch (error) {
+      if(!alive.current)return;
+      setChatErrors(prev => ({...prev,[requestStage]:{message:error instanceof Error?error.message:'The coach could not respond.',retryable:!(error instanceof CoachError)||error.retryable,request}}));
     } finally {
       pendingRef.current.delete(requestStage);
-      setPending((prev) => prev.filter((s) => s !== requestStage));
+      setPending(prev => prev.filter(s => s !== requestStage));
     }
+  }
+  async function send(text: string, claim?:string) {
+    if (!text.trim() || pendingRef.current.has(active)) return;
+    const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
+    const request:ChatRequest = {stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,intent:claim?"evaluate-claim":"chat",claim};
+    setConversations(prev => ({...prev,[active]:[...(prev[active]??[]),{id:crypto.randomUUID(),role:"student",text:studentText}]}));
+    await deliver(request);
+  }
+  function retry() {
+    const failed = chatErrors[active];
+    // Reuse the failed turn without adding another student bubble; honour the current meter.
+    if (failed?.retryable) void deliver({...failed.request,level,mode});
   }
   function onUpload() {
     uploadRef.current?.click();
@@ -112,6 +142,7 @@ export default function Workspace() {
     });
   }
   function navigate(name: string) {
+    if(name==="Challenges"){onLoadTask();return;}
     if (name === "AI Coach") {
       document
         .getElementById("ai-coach")
@@ -128,6 +159,7 @@ export default function Workspace() {
       <Header onNavigate={navigate} />
       <div className="workspace-shell">
         <ProgressSidebar
+          stages={stages}
           active={active}
           completed={completed}
           onStage={selectStage}
@@ -137,15 +169,19 @@ export default function Workspace() {
           <div className="breadcrumb">
             <button onClick={() => navigate("Challenges")}>Challenges</button>
             <ChevronRight size={13} />
-            <span>Wind-Powered Car</span>
+            <span>{task.title}</span><button onClick={onLoadTask}>Load STEM Challenge</button>
           </div>
-          <ChallengeCard />
+          <ChallengeCard task={task} />
+          <div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo responses · no AI call':responseMode==='ai'?'Connected to OpenAI':'Practice with Demo when AI is unavailable.'}</span></div>
           <AIChat
+            mode={responseMode??(mode==="demo"?"demo":undefined)}
             stage={stage}
             level={level}
             messages={messages}
             busy={pending.includes(active)}
-            onSend={send}
+            onSend={text=>void send(text)}
+            error={chatErrors[active]}
+            onRetry={retry}
             onUpload={onUpload}
             onComplete={() =>
               setCompleted((prev) =>
@@ -157,6 +193,7 @@ export default function Workspace() {
             complete={completed.includes(active)}
             onLevel={setLevel}
           />
+          {completed.includes(active)&&stages.findIndex(s=>s.id===active)<6&&<button className="primary-button next-stage" onClick={()=>selectStage(stages[stages.findIndex(s=>s.id===active)+1].id)}>Continue to {stages[stages.findIndex(s=>s.id===active)+1].title}<ArrowRight size={14}/></button>}
           <p className="workspace-footer">
             <span>Every question is a step forward.</span>
             <span>STEMPath AI · Research prototype</span>
@@ -168,11 +205,7 @@ export default function Workspace() {
               <Lightbulb size={18} />
               Key Questions
             </h2>
-            {[
-              "How does wind produce motion?",
-              "What factors affect speed?",
-              "How can you test and improve your design?",
-            ].map((question, i) => (
+            {keyQuestions(task,active).map((question, i) => (
               <div className="question" key={question}>
                 <span>0{i + 1}</span>
                 <p>{question}</p>
@@ -180,16 +213,20 @@ export default function Workspace() {
             ))}
           </section>
           <STEMJourney
+            stages={stages}
             active={active}
             completed={completed}
             onStage={selectStage}
           />
+          <LearningArtifacts task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))}/>
           <ArtifactUploader
             artifacts={artifacts}
             onUpload={onUpload}
             onRemove={removeArtifact}
           />
           <HelpMeter level={level} onChange={setLevel} />
+          {!dismissed.includes(active)&&canSuggestFading(level,active,records,messages.filter(m=>m.role==='student').length)&&<section className="rail-section fading"><p>You have recorded ideas and explained your thinking. Want to try with less help?</p><small>This is an invitation, not a score.</small><button onClick={()=>{setDismissed(prev=>[...prev,active]);setLevel((level-1) as SupportLevel)}}>Try Level {level-1}</button><button onClick={()=>setDismissed(prev=>[...prev,active])}>Keep my support</button></section>}
+          {['imagine','plan','test','improve'].includes(active)&&<AIChallenge disabled={pending.includes(active)} key={active} request={{task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode}} onRespond={(message,claim)=>void send(message,claim)}/>}
         </aside>
       </div>
       <input
@@ -259,7 +296,7 @@ export default function Workspace() {
               className="primary-button"
               onClick={() => {
                 try {
-                  localStorage.setItem("stempath-notebook-v1", note);
+                  localStorage.setItem(`stempath-notebook-v3-${taskStorageKey(task)}`, note);
                   setSaved(true);
                 } catch {
                   setError(
@@ -282,19 +319,17 @@ export default function Workspace() {
         ) : modal === "Resources" ? (
           <div className="resource-list">
             <article>
-              <Wind />
-              <h3>Explore wind and motion</h3>
+              <Compass />
+              <h3>Explore your question</h3>
               <p>
-                Observe a piece of paper in moving air. What changes when you
-                turn it? Sketch the direction of the wind and movement.
+                Write down what you know about {task.title}. Separate observations from assumptions and identify one question to investigate.
               </p>
             </article>
             <article>
               <FlaskConical />
               <h3>Make a fair test</h3>
               <p>
-                Change one thing at a time. Keep your starting point and wind
-                source consistent. Repeat your measurements and record every
+                Change one thing at a time. Keep relevant conditions consistent. Repeat your measurements and record every
                 result.
               </p>
             </article>
@@ -320,25 +355,23 @@ export default function Workspace() {
             </p>
             <p>
               Upload sketches through the image button. Images are previewed
-              locally and are not analysed by the mock coach. Chats, images, and
-              progress reset when you reload; saved notebook notes remain in
-              this browser.
+              locally and are not analysed by the coach. Chats, images, and
+              chat messages and images reset when you reload. The active task, stage progress and thinking records remain in this tab; notebook notes stay in this browser. Loading another task starts a fresh workspace.
             </p>
             <p>
-              This prototype uses predefined responses. It helps you practise
-              thinking through a challenge.
+              All seven stages support thinking about the active challenge. Auto mode uses AI when configured; otherwise responses are clearly marked Demo. Recent text and learning records are sent to OpenAI only in AI mode. AI claims are unverified: question them and collect evidence.
             </p>
           </div>
         ) : (
           <div className="project-overview">
-            <Wind size={32} />
+            <Compass size={32} />
             <h3>
-              {modal === "Home" ? "Welcome to STEMPath AI" : "Wind-Powered Car"}
+              {modal === "Home" ? "Welcome to STEMPath AI" : task.title}
             </h3>
             <p>
               {modal === "Home"
                 ? "Think, explore, build, and grow with your own ideas. Your first challenge is ready."
-                : `Design a wind-powered car that travels at least 3 metres. ${completed.length} of 7 stages completed.`}
+                : `${task.description} ${completed.length} of 7 stages completed.`}
             </p>
             <button className="primary-button" onClick={() => setModal(null)}>
               Continue challenge

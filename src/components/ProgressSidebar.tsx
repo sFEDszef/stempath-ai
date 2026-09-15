@@ -6,14 +6,16 @@ import {
   CircleHelp,
   ArrowRight,
 } from "lucide-react";
-import { stages } from "@/data/challenge";
-import type { StageId } from "@/types";
+
+import type { Stage, StageId } from "@/types";
 export function ProgressSidebar({
+  stages,
   active,
   completed,
   onStage,
   onTool,
 }: {
+  stages: Stage[];
   active: StageId;
   completed: StageId[];
   onStage: (id: StageId) => void;

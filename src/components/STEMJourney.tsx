@@ -1,11 +1,13 @@
 import { Check } from "lucide-react";
-import { stages } from "@/data/challenge";
-import type { StageId } from "@/types";
+
+import type { Stage, StageId } from "@/types";
 export function STEMJourney({
+  stages,
   active,
   completed,
   onStage,
 }: {
+  stages: Stage[];
   active: StageId;
   completed: StageId[];
   onStage: (id: StageId) => void;
