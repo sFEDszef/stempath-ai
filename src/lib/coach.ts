@@ -1,23 +1,16 @@
-import { stages, suggestedReplies } from "@/data/challenge";
-import type { CoachService } from "@/types";
-// Replace this adapter with a server endpoint when a real backend is introduced.
-// Keep provider credentials on the server; never put them in client components.
-export const mockCoach: CoachService = {
-  async respond({ stage, level, messages }) {
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    const current = stages.find((item) => item.id === stage)!;
-    const last = messages.at(-1)?.text ?? "";
-    const uncertain = /不确定|不知道|提示|hint|not sure/i.test(last);
-    let text = `${uncertain ? "没关系，先从一个小问题开始。" : "谢谢你分享你的想法。让我们用观察和证据继续探索。"}\n\n${current.prompts[level - 1]}`;
-    if (stage === "understand" && /大|bigger|larger/.test(last) && level === 1)
-      text =
-        "这是一个可以测试的猜想！\n如果帆变大，小车的稳定性也可能改变。你会怎样设计一个公平的比较，来检验你的想法？\n\nWhat would you keep the same while changing the sail size?";
-    return {
-      text,
-      suggestions:
-        stage === "understand"
-          ? suggestedReplies
-          : ["我想先画出我的想法。", "我不确定。", "我想比较两次测试的结果。"],
-    };
-  },
+import type { CoachService, ChatRequest } from '@/types';
+export class CoachError extends Error {
+  constructor(message:string, public retryable=true){super(message);this.name='CoachError';}
+}
+export const apiCoach: CoachService = {
+  async respond(request: ChatRequest) {
+    try {
+      const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request),signal:AbortSignal.timeout(35_000)});
+      const body=await response.json();
+      if (!response.ok) throw new CoachError(typeof body.error==='string'?body.error:'The coach could not respond.',body.retryable!==false);
+      if(typeof body.text!=='string'||!body.text.trim()||!Array.isArray(body.suggestions)||!body.suggestions.every((s:unknown)=>typeof s==='string')) throw new CoachError('The coach returned an invalid response. Please retry.');
+      if(body.mode!=='ai'&&body.mode!=='demo')throw new CoachError('Invalid coach mode.');
+      return {text:body.text,suggestions:body.suggestions,mode:body.mode};
+    }catch(error){if(error instanceof CoachError)throw error;throw new CoachError('Connection interrupted. Please retry. Your message is still here. / 连接中断，请重试。');}
+  }
 };
