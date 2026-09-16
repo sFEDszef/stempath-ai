@@ -1,4 +1,4 @@
-# v0.2 needs a server. Leave the already published v0.1 Pages artifact untouched.
+# Validation only: build the Next.js server application; do not deploy to Pages.
 name: Validate STEMPath AI
 on:
   push:
