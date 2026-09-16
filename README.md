@@ -2,6 +2,8 @@
 
 **Think · Explore · Build · Grow**
 
+Deployment status: this is a server-capable Next.js app, with validation-only GitHub Actions. See [deployment architecture and the Pages audit](docs/deployment.md). Vercel is not configured yet.
+
 A task-dynamic STEM learning workspace with seven reusable pedagogical stages, learner-controlled support and critical evaluation of AI. The original white, blue and green three-column interface is retained.
 
 ## Run locally
