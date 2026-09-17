@@ -23,7 +23,7 @@ export interface ChatRequest {
   artifacts: LearningArtifacts;
   completed: StageId[];
   mode?: "auto" | "demo";
-  intent?: "chat" | "challenge" | "evaluate-claim";
+  intent?: "chat" | "challenge" | "evaluate-claim" | "support-change";
   claim?: string;
 }
 export interface CoachResponse {

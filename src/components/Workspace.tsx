@@ -21,7 +21,10 @@ import { taskStorageKey } from "@/lib/stem/tasks";
 import { demoTasks } from "@/data/tasks";
 import { getStages, keyQuestions, pedagogy } from "@/lib/stem/stages";
 import { parseArtifacts } from "@/lib/stem/validation";
-import { canSuggestFading } from "@/lib/stem/fading";
+import { useAdaptive } from "@/lib/pedagogy/useAdaptive";
+import { readiness } from "@/lib/pedagogy/decisionEngine";
+import { suggestedReplies } from "@/lib/pedagogy/responses";
+import { SupportRecommendation } from "./SupportRecommendation";
 import { LearningArtifacts } from "./LearningArtifacts";
 import { AIChallenge } from "./AIChallenge";
 import { apiCoach, CoachError } from "@/lib/coach";
@@ -32,7 +35,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
   const [restored,setRestored]=useState(false);
   const [mode,setMode]=useState<'auto'|'demo'>('auto');
   const [responseMode,setResponseMode]=useState<'ai'|'demo'|undefined>();
-  const [dismissed,setDismissed]=useState<string[]>([]);
+  const [completionWarning,setCompletionWarning]=useState<string[]>([]);
   const alive=useRef(true);
   useEffect(()=>{alive.current=true;return()=>{alive.current=false}},[]);
 
@@ -43,7 +46,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
     Partial<Record<StageId, Message[]>>
   >({ understand: [{id:'welcome',role:'assistant',text:`Let’s explore “${task.title}”. ${pedagogy.understand.questions[0]}
 
-用你喜欢的语言表达你的想法。`,suggestions:pedagogy.understand.replies}] });
+You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
   const [pending, setPending] = useState<StageId[]>([]);
   const pendingRef = useRef(new Set<StageId>());
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
@@ -57,6 +60,23 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
   const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`For “${task.title}”, let’s explore ${stage.title}. ${stage.prompts[level-1]}`,suggestions:pedagogy[active].replies}];
+  const adaptiveRequest:ChatRequest={task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode};
+  const adaptive=useAdaptive(adaptiveRequest);
+  const lang=adaptive.decision.state.language;
+  function changeLevel(next:SupportLevel){adaptive.record('manual-support-change',{supportRecommendation:next});setLevel(next);}
+  function completeStage(force=false){
+    if(completed.includes(active)){setCompleted(prev=>prev.filter(id=>id!==active));adaptive.record('stage-reopened',{stageCompleted:false});return;}
+    const missing=readiness(task,active,records);
+    if(!force&&missing.length){setCompletionWarning(missing);return;}
+    setCompleted(prev=>[...prev,active]);setCompletionWarning([]);adaptive.record('stage-completed',{stageCompleted:true});
+  }
+  function chooseSupport(accept:boolean){
+    const next=adaptive.resolveRecommendation(accept);
+    if(accept&&next){setLevel(next);
+      const history=messages.slice(-12).map(({role,text})=>({role,text}));
+      void deliver({...adaptiveRequest,level:next,history,intent:'support-change',message:lang==='zh'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
+    }
+  }
   useEffect(() => {
     try {
       const raw=sessionStorage.getItem('stempath-progress-v3');
@@ -82,6 +102,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
   }, [modal]);
   function selectStage(id: StageId) {
     setActive(id);
+    setCompletionWarning([]);
     setConversations((prev) =>
       prev[id]
         ? prev
@@ -91,8 +112,8 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                text: `For “${task.title}”, let’s explore ${stages.find((s) => s.id === id)!.title}.\n\n${stages.find((s) => s.id === id)!.prompts[level - 1]}`,
-                suggestions: pedagogy[id].replies,
+                text: lang==='zh'?`接下来探索“${task.title}”的 ${stages.find(s=>s.id===id)!.title} 阶段。你准备先思考什么？`:`For “${task.title}”, let’s explore ${stages.find((s) => s.id === id)!.title}.\n\n${stages.find((s) => s.id === id)!.prompts[level - 1]}`,
+                suggestions: suggestedReplies(lang),
               },
             ],
           },
@@ -121,6 +142,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
     if (!text.trim() || pendingRef.current.has(active)) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
     const request:ChatRequest = {stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,intent:claim?"evaluate-claim":"chat",claim};
+    adaptive.record("student-message",{}, {...request,message:text.trim()});
     setConversations(prev => ({...prev,[active]:[...(prev[active]??[]),{id:crypto.randomUUID(),role:"student",text:studentText}]}));
     await deliver(request);
   }
@@ -177,22 +199,18 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
             mode={responseMode??(mode==="demo"?"demo":undefined)}
             stage={stage}
             level={level}
-            messages={messages}
+            messages={messages.map(m=>m.suggestions?{...m,suggestions:suggestedReplies(lang)}:m)}
             busy={pending.includes(active)}
             onSend={text=>void send(text)}
             error={chatErrors[active]}
             onRetry={retry}
             onUpload={onUpload}
-            onComplete={() =>
-              setCompleted((prev) =>
-                prev.includes(active)
-                  ? prev.filter((s) => s !== active)
-                  : [...prev, active],
-              )
-            }
+            onComplete={()=>completeStage()}
             complete={completed.includes(active)}
-            onLevel={setLevel}
+            onLevel={changeLevel}
           />
+          {completionWarning.length>0&&<section className="rail-section" role="alert"><p>{lang==='zh'?'你可以继续，但以下思考记录还不完整：':'You can continue, but these thinking records are still missing:'} {completionWarning.join(', ')}</p><button onClick={()=>setCompletionWarning([])}>{lang==='zh'?'返回补充':'Go back'}</button><button onClick={()=>completeStage(true)}>{lang==='zh'?'仍然继续':'Continue anyway'}</button></section>}
+          {adaptive.debug&&<details className="rail-section"><summary>Developer: adaptive state</summary><button onClick={adaptive.clearTrace}>Clear local trace</button><pre style={{whiteSpace:'pre-wrap',fontSize:12}}>{JSON.stringify({state:adaptive.decision,trace:adaptive.trace},null,2)}</pre></details>}
           {completed.includes(active)&&stages.findIndex(s=>s.id===active)<6&&<button className="primary-button next-stage" onClick={()=>selectStage(stages[stages.findIndex(s=>s.id===active)+1].id)}>Continue to {stages[stages.findIndex(s=>s.id===active)+1].title}<ArrowRight size={14}/></button>}
           <p className="workspace-footer">
             <span>Every question is a step forward.</span>
@@ -200,7 +218,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
           </p>
         </main>
         <aside className="right-sidebar">
-          <section className="rail-section questions">
+          <details className="rail-section questions"><summary>Key Questions</summary>
             <h2>
               <Lightbulb size={18} />
               Key Questions
@@ -211,22 +229,25 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
                 <p>{question}</p>
               </div>
             ))}
-          </section>
+          </details>
           <STEMJourney
             stages={stages}
             active={active}
             completed={completed}
             onStage={selectStage}
           />
-          <LearningArtifacts task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))}/>
-          <ArtifactUploader
+          <LearningArtifacts task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))} onRecord={()=>adaptive.record("artifact-edited")}/>
+          <details className="rail-section"><summary>Your uploaded images</summary><ArtifactUploader
             artifacts={artifacts}
             onUpload={onUpload}
             onRemove={removeArtifact}
           />
-          <HelpMeter level={level} onChange={setLevel} />
-          {!dismissed.includes(active)&&canSuggestFading(level,active,records,messages.filter(m=>m.role==='student').length)&&<section className="rail-section fading"><p>You have recorded ideas and explained your thinking. Want to try with less help?</p><small>This is an invitation, not a score.</small><button onClick={()=>{setDismissed(prev=>[...prev,active]);setLevel((level-1) as SupportLevel)}}>Try Level {level-1}</button><button onClick={()=>setDismissed(prev=>[...prev,active])}>Keep my support</button></section>}
-          {['imagine','plan','test','improve'].includes(active)&&<AIChallenge disabled={pending.includes(active)} key={active} request={{task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode}} onRespond={(message,claim)=>void send(message,claim)}/>}
+          </details>
+          <HelpMeter level={level} onChange={changeLevel} />
+          <p className="support-status" aria-live="polite">{lang==='zh'?'AI 支持':'AI support'}: {adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(lang==='zh'?'可以尝试更具体的提示':'A stronger hint is available'):(lang==='zh'?'可以尝试更独立地思考':'Ready to try more independently')):(lang==='zh'?'按你选择的等级引导':'Guidance at your chosen level')}</p>
+          {adaptive.showRecommendation&&<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>}
+          {adaptive.decision.challengeEligible&&<AIChallenge language={lang} onTrigger={()=>adaptive.record('ai-challenge',{aiChallengeTriggered:true})} disabled={pending.includes(active)} key={active} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
+
         </aside>
       </div>
       <input
@@ -343,7 +364,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
             </article>
           </div>
         ) : modal === "Help" ? (
-          <div className="help-content">
+          <div className="help-content"><p>Adaptive suggestions use simple interaction indicators, not psychological scores. A maximum of 200 metadata events from this workspace are saved locally for debugging; no chat text or notes are included in this trace. The trace is never uploaded. Reloading starts a new in-memory trace; the last saved snapshot remains until replaced or cleared.</p><button onClick={adaptive.clearTrace}>Clear local interaction trace</button>
             <p>
               Choose any STEM stage to explore. Use{" "}
               <strong>Complete stage</strong> when you are ready; select it

@@ -1,4 +1,4 @@
-# STEMPath AI v0.3 — Complete STEM Learning Journey
+# STEMPath AI v0.4 — Adaptive Scaffolding Engine
 
 **Think · Explore · Build · Grow**
 
@@ -48,7 +48,7 @@ This validates and dispatches a local event consumed by the mounted TaskWorkspac
 - `src/lib/stem/validation.ts`: bounded server request and record validation.
 - `src/lib/stem/handler.ts`: official OpenAI Responses API, `store:false`, safe errors and missing-key Demo fallback.
 - `src/lib/stem/demo.ts`: deterministic, bilingual, task-aware practice responses and claims; no model reasoning.
-- `src/lib/stem/fading.ts`: optional fading invitation, never a mastery judgement.
+- `src/lib/pedagogy/decisionEngine.ts`: optional fading invitation, never a mastery judgement.
 - `src/components/TaskWorkspace.tsx`, `TaskLoader.tsx`: active-task lifecycle and input.
 - `LearningArtifacts.tsx`, `AIChallenge.tsx`: thinking records and claim evaluation using existing card styling.
 - `Workspace.tsx`, `AIChat.tsx`, sidebars: shared stage state, completion, conversations, loading, errors and retry.
@@ -70,3 +70,7 @@ Support fading is an opt-in heuristic, not adaptive assessment. Demo replies are
 Automated checks cover all stages, support routing, validation, prompt boundaries, Demo fallback, claim behavior and three distinct tasks. Browser QA covers the full journey, task switching, typed and suggested messages, records, completion, fading, claims, retry and laptop/tablet rendering. Live model quality and research validity are separate evaluations.
 
 For v0.4, prioritize reviewed cross-task coaching evaluations and learner-controlled export of the learning record before adding accounts or research data collection.
+
+## Adaptive scaffolding
+
+See [v0.4 engine rules, storage, debug mode and limitations](docs/adaptive-scaffolding.md). The coach now recommends stronger support after repeated uncertainty, invites optional fading after independent reasoning, and makes AI Challenge contextual. All behavior works without an API key.
