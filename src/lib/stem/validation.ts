@@ -1,3 +1,4 @@
+import { parseResearchConfig } from '@/lib/research/config';
 import { stageIds } from './stages';
 import { loadTask } from './tasks';
 import type { ChatRequest, LearningArtifacts, StageId } from '@/types';
@@ -29,5 +30,5 @@ export function parseChatRequest(input:unknown):ChatRequest {
  if(v.mode!==undefined&&!['auto','demo'].includes(v.mode as string))throw new Error('Invalid mode');
  if(v.intent!==undefined&&!['chat','challenge','evaluate-claim','support-change'].includes(v.intent as string))throw new Error('Invalid intent');
  if(v.claim!==undefined&&!text(v.claim,4000))throw new Error('Invalid claim');
- return {stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
+ return {research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
 }

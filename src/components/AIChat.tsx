@@ -5,6 +5,7 @@ import { supportLabels } from "@/data/challenge";
 import type { Message, Stage, SupportLevel } from "@/types";
 export function AIChat({
   mode,
+  coachDisabled=false, supportDisabled=false, sessionFinished=false,
   stage,
   level,
   messages,
@@ -18,6 +19,7 @@ export function AIChat({
   onRetry,
 }: {
   mode?: "ai"|"demo";
+  coachDisabled?:boolean; supportDisabled?:boolean; sessionFinished?:boolean;
   error?: {message:string; retryable:boolean};
   onRetry: () => void;
   stage: Stage;
@@ -44,7 +46,7 @@ export function AIChat({
     }
   }, [messages.length, error, busy]);
   function submit() {
-    if (input.trim() && !busy) {
+    if (input.trim() && !busy && !coachDisabled) {
       onSend(input.trim());
       setInput("");
     }
@@ -62,7 +64,7 @@ export function AIChat({
           </div>
         </div>
         <span className="mock-badge">
-          <i /> {mode === "ai" ? "OpenAI" : mode === "demo" ? "Demo" : "Auto"}
+          <i /> {coachDisabled ? "Guided workspace" : mode === "ai" ? "OpenAI" : mode === "demo" ? "Demo" : "Auto"}
         </span>
       </div>
       <div className="chat-context">
@@ -74,6 +76,7 @@ export function AIChat({
           <span className="support-select">
             <select
               aria-label="Current Support Level"
+              disabled={supportDisabled||coachDisabled}
               value={level}
               onChange={(e) => onLevel(Number(e.target.value) as SupportLevel)}
             >
@@ -95,7 +98,8 @@ export function AIChat({
         aria-live="polite"
       >
         <div className="chat-date">LET’S EXPLORE TOGETHER</div>
-        {messages.map((message) => (
+        {coachDisabled&&<p className="static-stage-prompt">{sessionFinished?"Your session is complete. Review your thinking records below.":`Use Your Thinking to explore this stage: ${stage.question}`}</p>}
+        {!coachDisabled&&messages.map((message) => (
           <ChatMessage
             key={message.id}
             message={message}
@@ -103,14 +107,14 @@ export function AIChat({
             disabled={busy}
           />
         ))}
-        {busy && (
+        {!coachDisabled&&busy && (
           <div className="thinking">
             <Sparkles size={15} /> Your coach is thinking<span>•••</span>
           </div>
         )}
-        {error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{error.message}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>Retry / 重试</button></div>}</div></div>}
+        {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{error.message}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>Retry / 重试</button></div>}</div></div>}
       </div>
-      <div className="composer-area">
+      {!coachDisabled&&<div className="composer-area">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -159,9 +163,10 @@ export function AIChat({
           <span>Enter to send</span>
         </div>
       </div>
+      }
       <div className="stage-footer">
-        <span>{supportLabels[level]} · Space to think for yourself</span>
-        <button onClick={onComplete} className={complete ? "is-complete" : ""}>
+        <span>{coachDisabled?"Space to record your own thinking":supportLabels[level]+" · Space to think for yourself"}</span>
+        <button disabled={sessionFinished} onClick={onComplete} className={complete ? "is-complete" : ""}>
           <Check size={14} />
           {complete ? "Stage completed" : "Complete stage"}
         </button>

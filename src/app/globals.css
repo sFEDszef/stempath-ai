@@ -1679,3 +1679,18 @@ dialog::backdrop {
 .fading button:disabled { opacity: .5; cursor: wait; }
 .rail-section > summary { cursor: pointer; font-weight: 600; padding: 8px 0; }
 .learning-artifacts details summary { font-size: 12px; margin-top: 12px; cursor: pointer; }
+
+/* Research tools reuse the existing workspace palette and stay out of student mode. */
+.research-panel {background:#f7fafc;border:1px solid #e2eaf0;border-radius:12px;padding:20px;margin-top:24px;}
+.research-panel p,.research-panel small {font-size:12px;line-height:1.65;color:#596b7c;}
+.research-panel dl {display:grid;grid-template-columns:minmax(120px,1fr) 2fr;gap:8px;font-size:12px;}
+.research-panel dd {margin:0;overflow-wrap:anywhere;}
+.research-panel label {display:block;font-size:12px;margin:12px 0;}
+.research-panel input:not([type=checkbox]),.research-panel select,.research-panel textarea {display:block;width:100%;max-width:100%;padding:8px;border:1px solid #dbe5ee;border-radius:7px;background:white;color:#27394a;}
+.research-panel details {border-top:1px solid #e2eaf0;padding:12px 0;}
+.research-panel button,.research-actions button {border:1px solid #dbe5ee;border-radius:7px;padding:7px 10px;background:white;color:#385b78;font-size:12px;margin:4px;}
+.research-actions {display:flex;flex-wrap:wrap;gap:5px;}
+.research-panel pre {font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;}
+.static-stage-prompt {padding:20px;color:#597084;line-height:1.8;}
+.completion-summary {background:#f0f8f4;border-radius:12px;padding:18px;margin-top:20px;line-height:1.8;}
+button:disabled {cursor:not-allowed;opacity:.55;}

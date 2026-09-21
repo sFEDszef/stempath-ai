@@ -22,6 +22,11 @@ import { demoTasks } from "@/data/tasks";
 import { getStages, keyQuestions, pedagogy } from "@/lib/stem/stages";
 import { parseArtifacts } from "@/lib/stem/validation";
 import { useAdaptive } from "@/lib/pedagogy/useAdaptive";
+import { ResearchPanel } from "./ResearchPanel";
+import type { ResearchController } from "@/lib/research/useResearchSession";
+import { conditionConfig, initialLevel, aiEnabled, type ResearchConfig } from "@/lib/research/config";
+import { sessionSummary, type Choice } from "@/lib/research/session";
+import { decidePedagogicalAction } from "@/lib/pedagogy/decisionEngine";
 import { readiness } from "@/lib/pedagogy/decisionEngine";
 import { suggestedReplies } from "@/lib/pedagogy/responses";
 import { SupportRecommendation } from "./SupportRecommendation";
@@ -29,7 +34,14 @@ import { LearningArtifacts } from "./LearningArtifacts";
 import { AIChallenge } from "./AIChallenge";
 import { apiCoach, CoachError } from "@/lib/coach";
 import type { Artifact, Message, StageId, SupportLevel, ChatRequest, STEMTask, LearningArtifacts as Thinking } from "@/types";
-export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()=>void}) {
+export default function Workspace({task,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
+  const config=research.session?.config??conditionConfig();
+  const coachEnabled=aiEnabled(config),finished=!!research.session?.completedAt;
+  const manualSupport=config.allowManualSupportChange&&coachEnabled&&!finished;
+  const lastArtifacts=useRef<Record<string,string>>({});
+  const challengeRef=useRef<{id:string;stage:StageId}|null>(null);
+  const suggestionRef=useRef('');
+  const {event:researchEvent,language:researchLanguage}=research;
   const stages=getStages(task);
   const [records,setRecords]=useState<Thinking>({});
   const [restored,setRestored]=useState(false);
@@ -41,7 +53,7 @@ export default function Workspace({task,onLoadTask}:{task:STEMTask;onLoadTask:()
 
   const [active, setActive] = useState<StageId>("understand");
   const [completed, setCompleted] = useState<StageId[]>([]);
-  const [level, setLevel] = useState<SupportLevel>(1);
+  const [level, setLevel] = useState<SupportLevel>(initialLevel(config.condition));
   const [conversations, setConversations] = useState<
     Partial<Record<StageId, Message[]>>
   >({ understand: [{id:'welcome',role:'assistant',text:`Let’s explore “${task.title}”. ${pedagogy.understand.questions[0]}
@@ -60,19 +72,30 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
   const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`For “${task.title}”, let’s explore ${stage.title}. ${stage.prompts[level-1]}`,suggestions:pedagogy[active].replies}];
-  const adaptiveRequest:ChatRequest={task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode};
+  const adaptiveRequest:ChatRequest={task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
-  function changeLevel(next:SupportLevel){adaptive.record('manual-support-change',{supportRecommendation:next});setLevel(next);}
+  useEffect(()=>{researchLanguage(lang);},[lang,researchLanguage]);
+  const recommendationKey=adaptive.showRecommendation?`${active}:${adaptive.decision.reason}:${adaptive.decision.recommendation}`:'';
+  useEffect(()=>{
+    if(recommendationKey&&suggestionRef.current!==recommendationKey){const fade=adaptive.decision.reason==='fade';researchEvent(fade?'FADING_SUGGESTED':'ESCALATION_SUGGESTED',{supportRecommendation:adaptive.decision.recommendation,fadingSuggested:fade,escalationSuggested:!fade});}
+    suggestionRef.current=recommendationKey;
+  },[recommendationKey,adaptive.decision.reason,adaptive.decision.recommendation,researchEvent]);
+  function changeLevel(next:SupportLevel){if(!manualSupport)return;research.support(next,'STUDENT');setLevel(next);}
+  function recordArtifact(field:string,value:string){const key=`${active}:${field}`;if(lastArtifacts.current[key]===value||(!value&&!lastArtifacts.current[key]))return;lastArtifacts.current[key]=value;research.artifact(active,field,value);}
+
   function completeStage(force=false){
-    if(completed.includes(active)){setCompleted(prev=>prev.filter(id=>id!==active));adaptive.record('stage-reopened',{stageCompleted:false});return;}
-    const missing=readiness(task,active,records);
+    if(finished)return;
+    if(completed.includes(active)){setCompleted(prev=>prev.filter(id=>id!==active));research.complete(active,false);return;}
+    const missing=readiness(task,active,records).filter(field=>coachEnabled||!field.includes('AI'));
     if(!force&&missing.length){setCompletionWarning(missing);return;}
-    setCompleted(prev=>[...prev,active]);setCompletionWarning([]);adaptive.record('stage-completed',{stageCompleted:true});
+    setCompleted(prev=>[...prev,active]);setCompletionWarning([]);research.complete(active,true);
   }
   function chooseSupport(accept:boolean){
+    const fade=adaptive.decision.reason==='fade';
+    research.event(fade?(accept?'FADING_ACCEPTED':'FADING_REJECTED'):(accept?'ESCALATION_ACCEPTED':'ESCALATION_REJECTED'),{supportRecommendation:adaptive.decision.recommendation,fadingAccepted:fade?accept:undefined,escalationAccepted:!fade?accept:undefined});
     const next=adaptive.resolveRecommendation(accept);
-    if(accept&&next){setLevel(next);
+    if(accept&&next){research.support(next,'SYSTEM_RECOMMENDATION');setLevel(next);
       const history=messages.slice(-12).map(({role,text})=>({role,text}));
       void deliver({...adaptiveRequest,level:next,history,intent:'support-change',message:lang==='zh'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
     }
@@ -84,7 +107,11 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
         setRecords(parseArtifacts(data.records));
         if(Array.isArray(data.completed)&&data.completed.every((id:unknown)=>stages.some(s=>s.id===id)))setCompleted([...new Set<StageId>(data.completed)]);
         if(stages.some(s=>s.id===data.active))setActive(data.active);
-        if([1,2,3].includes(data.level))setLevel(data.level);
+        if([1,2,3].includes(data.level)&&config.condition==='ADAPTIVE_SUPPORT'){setLevel(data.level);research.support(data.level,'STUDENT');}
+        research.event('WORKSPACE_RESTORED',{systemAction:'SAVED_LEARNING_DRAFT'});
+        if(stages.some(s=>s.id===data.active))research.stage(data.active);
+        for(const id of data.completed??[])if(stages.some(s=>s.id===id))research.complete(id,true);
+        for(const [stageId,fields] of Object.entries(parseArtifacts(data.records)))for(const [field,value] of Object.entries(fields)){lastArtifacts.current[`${stageId}:${field}`]=value;}
       }}
       setNote(localStorage.getItem(`stempath-notebook-v3-${taskStorageKey(task)}`) ?? (task.id===demoTasks[0].id?localStorage.getItem("stempath-notebook-v1"):null) ?? "");
     } catch {
@@ -101,6 +128,7 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     else dialog.current?.close();
   }, [modal]);
   function selectStage(id: StageId) {
+    research.stage(id);
     setActive(id);
     setCompletionWarning([]);
     setConversations((prev) =>
@@ -120,6 +148,7 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     );
   }
   async function deliver(request: ChatRequest) {
+    if(!coachEnabled||finished)return;
     const requestStage = request.stage;
     if (pendingRef.current.has(requestStage)) return;
     pendingRef.current.add(requestStage);
@@ -128,10 +157,12 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     try {
       const response = await apiCoach.respond(request);
       if(!alive.current)return;
+      research.event('AI_RESPONSE',{messageText:response.text,systemAction:response.mode.toUpperCase()},requestStage,request.level);
       setResponseMode(response.mode);
       setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response}]}));
     } catch (error) {
       if(!alive.current)return;
+      research.event('AI_ERROR',{systemAction:'GENERATION_FAILED'},requestStage);
       setChatErrors(prev => ({...prev,[requestStage]:{message:error instanceof Error?error.message:'The coach could not respond.',retryable:!(error instanceof CoachError)||error.retryable,request}}));
     } finally {
       pendingRef.current.delete(requestStage);
@@ -139,17 +170,22 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     }
   }
   async function send(text: string, claim?:string) {
-    if (!text.trim() || pendingRef.current.has(active)) return;
+    if (!text.trim() || pendingRef.current.has(active)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
-    const request:ChatRequest = {stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,intent:claim?"evaluate-claim":"chat",claim};
-    adaptive.record("student-message",{}, {...request,message:text.trim()});
+    const request:ChatRequest = {stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
+    adaptive.onStudentTurn();
+    const decision=decidePedagogicalAction({...request,message:text.trim()});
+    research.event('MESSAGE_SENT',{messageText:text.trim(),learnerSignal:Object.entries(decision.state.signals).filter(([,v])=>v).map(([key])=>key),pedagogicalDecision:decision.action,supportRecommendation:decision.recommendation});
+    if(!claim&&challengeRef.current?.stage===active){const signals=decision.state.signals;const action=/test|trial|measure|测试|检验|测量/i.test(text)?'TEST':signals.reasoning?'REASON':signals.uncertain?'REQUEST_HELP':undefined;
+      if(action)research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current.id,followUpAction:action});}
+
     setConversations(prev => ({...prev,[active]:[...(prev[active]??[]),{id:crypto.randomUUID(),role:"student",text:studentText}]}));
     await deliver(request);
   }
   function retry() {
     const failed = chatErrors[active];
     // Reuse the failed turn without adding another student bubble; honour the current meter.
-    if (failed?.retryable) void deliver({...failed.request,level,mode});
+    if (failed?.retryable) void deliver({...failed.request,level,mode,research:config});
   }
   function onUpload() {
     uploadRef.current?.click();
@@ -194,8 +230,11 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             <span>{task.title}</span><button onClick={onLoadTask}>Load STEM Challenge</button>
           </div>
           <ChallengeCard task={task} />
-          <div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo responses · no AI call':responseMode==='ai'?'Connected to OpenAI':'Practice with Demo when AI is unavailable.'}</span></div>
+          {coachEnabled&&<div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo responses · no AI call':responseMode==='ai'?'Connected to OpenAI':'Practice with Demo when AI is unavailable.'}</span></div>}
           <AIChat
+            coachDisabled={!coachEnabled||finished}
+            supportDisabled={!manualSupport}
+            sessionFinished={finished}
             mode={responseMode??(mode==="demo"?"demo":undefined)}
             stage={stage}
             level={level}
@@ -210,7 +249,8 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             onLevel={changeLevel}
           />
           {completionWarning.length>0&&<section className="rail-section" role="alert"><p>{lang==='zh'?'你可以继续，但以下思考记录还不完整：':'You can continue, but these thinking records are still missing:'} {completionWarning.join(', ')}</p><button onClick={()=>setCompletionWarning([])}>{lang==='zh'?'返回补充':'Go back'}</button><button onClick={()=>completeStage(true)}>{lang==='zh'?'仍然继续':'Continue anyway'}</button></section>}
-          {adaptive.debug&&<details className="rail-section"><summary>Developer: adaptive state</summary><button onClick={adaptive.clearTrace}>Clear local trace</button><pre style={{whiteSpace:'pre-wrap',fontSize:12}}>{JSON.stringify({state:adaptive.decision,trace:adaptive.trace},null,2)}</pre></details>}
+          {active==='reflect'&&completed.includes('reflect')&&research.session&&<section className="rail-section completion-summary"><h2>Your learning journey</h2><p>Stages completed: {sessionSummary(research.session).stages} · Thinking-record revisions: {sessionSummary(research.session).revisions} · Evidence-related messages: {sessionSummary(research.session).evidence} · AI challenges considered: {sessionSummary(research.session).challenges} · Support changes: {sessionSummary(research.session).supportChanges}</p><p>{finished?'This session is complete. You can review your notes or load a challenge to begin again.':'These describe your activity, not a score.'}</p>{!finished&&<button className="primary-button" disabled={pending.length>0} onClick={research.finish}>Finish learning session</button>}</section>}
+          {researchVisible&&<ResearchPanel research={research} task={task} decision={adaptive.decision} onReset={onResearchReset} onClear={onResearchClear} onTask={onAssignTask} onHide={onHideResearch}/>}
           {completed.includes(active)&&stages.findIndex(s=>s.id===active)<6&&<button className="primary-button next-stage" onClick={()=>selectStage(stages[stages.findIndex(s=>s.id===active)+1].id)}>Continue to {stages[stages.findIndex(s=>s.id===active)+1].title}<ArrowRight size={14}/></button>}
           <p className="workspace-footer">
             <span>Every question is a step forward.</span>
@@ -236,17 +276,17 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             completed={completed}
             onStage={selectStage}
           />
-          <LearningArtifacts task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))} onRecord={()=>adaptive.record("artifact-edited")}/>
+          <LearningArtifacts key={active} task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))} onRecord={recordArtifact} disabled={finished} aiAvailable={coachEnabled}/>
           <details className="rail-section"><summary>Your uploaded images</summary><ArtifactUploader
             artifacts={artifacts}
             onUpload={onUpload}
             onRemove={removeArtifact}
           />
           </details>
-          <HelpMeter level={level} onChange={changeLevel} />
-          <p className="support-status" aria-live="polite">{lang==='zh'?'AI 支持':'AI support'}: {adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(lang==='zh'?'可以尝试更具体的提示':'A stronger hint is available'):(lang==='zh'?'可以尝试更独立地思考':'Ready to try more independently')):(lang==='zh'?'按你选择的等级引导':'Guidance at your chosen level')}</p>
-          {adaptive.showRecommendation&&<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>}
-          {adaptive.decision.challengeEligible&&<AIChallenge language={lang} onTrigger={()=>adaptive.record('ai-challenge',{aiChallengeTriggered:true})} disabled={pending.includes(active)} key={active} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
+          {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport}/>}
+          {coachEnabled&&<p className="support-status" aria-live="polite">{lang==='zh'?'AI 支持':'AI support'}: {adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(lang==='zh'?'可以尝试更具体的提示':'A stronger hint is available'):(lang==='zh'?'可以尝试更独立地思考':'Ready to try more independently')):(lang==='zh'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
+          {!finished&&adaptive.showRecommendation&&<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>}
+          {!finished&&adaptive.decision.challengeEligible&&<AIChallenge language={lang} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={pending.includes(active)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
 
         </aside>
       </div>
@@ -364,7 +404,7 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             </article>
           </div>
         ) : modal === "Help" ? (
-          <div className="help-content"><p>Adaptive suggestions use simple interaction indicators, not psychological scores. A maximum of 200 metadata events from this workspace are saved locally for debugging; no chat text or notes are included in this trace. The trace is never uploaded. Reloading starts a new in-memory trace; the last saved snapshot remains until replaced or cleared.</p><button onClick={adaptive.clearTrace}>Clear local interaction trace</button>
+          <div className="help-content"><p>Adaptive guidance uses interaction patterns, not psychological scores. Anonymous research metadata stays in this browser. Message and artifact text is excluded from the research trace by default; a researcher may explicitly enable local text capture. Learning drafts and notebook notes are stored separately. Research mode provides export and retention controls.</p>
             <p>
               Choose any STEM stage to explore. Use{" "}
               <strong>Complete stage</strong> when you are ready; select it

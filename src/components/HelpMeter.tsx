@@ -4,8 +4,10 @@ import type { SupportLevel } from "@/types";
 export function HelpMeter({
   level,
   onChange,
+  disabled=false,
 }: {
   level: SupportLevel;
+  disabled?:boolean;
   onChange: (level: SupportLevel) => void;
 }) {
   return (
@@ -26,6 +28,7 @@ export function HelpMeter({
         {([1, 2, 3] as const).map((n) => (
           <button
             key={n}
+            disabled={disabled}
             aria-label={`Level ${n}: ${supportLabels[n]}`}
             aria-pressed={level === n}
             onClick={() => onChange(n)}

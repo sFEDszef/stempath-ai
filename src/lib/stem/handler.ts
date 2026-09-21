@@ -1,3 +1,4 @@
+import { aiEnabled, conditionConfig } from '@/lib/research/config';
 import 'server-only';
 import OpenAI from 'openai';
 import { decidePedagogicalAction, providerStrategy } from '@/lib/pedagogy/decisionEngine';
@@ -47,6 +48,7 @@ export async function handleChat(req: Request, generate: GenerateReply = generat
     const bytes = new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
     request=parseChatRequest(JSON.parse(new TextDecoder().decode(bytes)));
   } catch {return reply({error:'Check the stage, support level, message, and conversation length.',retryable:false},400);}
+  if(!aiEnabled(request.research??conditionConfig()))return reply({error:'Coach responses are unavailable in this workspace. Use the stage prompts and Your Thinking.',retryable:false},403);
   if(request.intent==='challenge'&&!decidePedagogicalAction(request).challengeEligible)return reply({error:'Explore your current question and record some evidence before trying an AI Challenge.',retryable:false},409);
   if (request.mode==='demo' || (generate===generateReply && !process.env.OPENAI_API_KEY)) return reply(demoReply(request));
   try {return reply({text:await generate(request),suggestions:request.intent==='challenge'?[]:suggestedReplies(decidePedagogicalAction(request).state.language),mode:'ai'});}

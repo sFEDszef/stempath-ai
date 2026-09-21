@@ -1,3 +1,4 @@
+import { conditionConfig } from '@/lib/research/config';
 import type { ChatRequest, StageId, SupportLevel, STEMTask, LearningArtifacts } from '@/types';
 import { artifactFields } from '@/lib/stem/stages';
 import { detectSignals, meaningful, languageOf, type Signals, type Language } from './signals';
@@ -8,7 +9,7 @@ export interface LearnerState {
  meaningfulArtifacts:number; fadingRecommended:boolean; strongerSupportRecommended:boolean; aiChallengeEligible:boolean;
  language:Language; signals:Signals; focus:'goal'|'condition'|'evidence'|'reasoning';
 }
-export type Action='ASK_SOCRATIC_QUESTION'|'GIVE_DIRECTIONAL_HINT'|'PROVIDE_STRUCTURED_SUPPORT'|'REQUEST_EVIDENCE'|'PROMPT_REFLECTION'|'RETURN_AGENCY'|'TRIGGER_AI_CHALLENGE';
+export type Action='STATIC_STAGE_PROMPT'|'ASK_SOCRATIC_QUESTION'|'GIVE_DIRECTIONAL_HINT'|'PROVIDE_STRUCTURED_SUPPORT'|'REQUEST_EVIDENCE'|'PROMPT_REFLECTION'|'RETURN_AGENCY'|'TRIGGER_AI_CHALLENGE';
 export interface Decision {action:Action; recommendation?:SupportLevel; reason?:'stronger'|'fade'; challengeEligible:boolean; state:LearnerState}
 export function artifactProgress(task:STEMTask,stage:StageId,records:LearningArtifacts) {
  const fields=artifactFields(task,stage);
@@ -39,7 +40,13 @@ export function evaluateLearnerState(request:ChatRequest):LearnerState {
 }
 export function decidePedagogicalAction(request:ChatRequest):Decision {
  const state=evaluateLearnerState(request);
- const action:Action=request.intent==='challenge'&&state.aiChallengeEligible?'TRIGGER_AI_CHALLENGE':request.intent==='evaluate-claim'||state.signals.critical?'REQUEST_EVIDENCE':state.consecutiveProductiveResponses>=3&&state.independenceScore>=2/3?'RETURN_AGENCY':request.stage==='reflect'?'PROMPT_REFLECTION':request.level===1?'ASK_SOCRATIC_QUESTION':request.level===2?'GIVE_DIRECTIONAL_HINT':'PROVIDE_STRUCTURED_SUPPORT';
+ const config=request.research??conditionConfig();
+ const noAI=config.condition==='NO_AI';
+ const adaptive=config.condition==='ADAPTIVE_SUPPORT'||config.condition==='CUSTOM';
+ state.strongerSupportRecommended=state.strongerSupportRecommended&&adaptive&&config.enableEscalation&&!noAI;
+ state.fadingRecommended=state.fadingRecommended&&adaptive&&config.enableFading&&!noAI;
+ state.aiChallengeEligible=state.aiChallengeEligible&&config.enableAIChallenge&&!noAI;
+ const action:Action=noAI?'STATIC_STAGE_PROMPT':request.intent==='challenge'&&state.aiChallengeEligible?'TRIGGER_AI_CHALLENGE':request.intent==='evaluate-claim'||state.signals.critical?'REQUEST_EVIDENCE':state.consecutiveProductiveResponses>=3&&state.independenceScore>=2/3?'RETURN_AGENCY':request.stage==='reflect'?'PROMPT_REFLECTION':request.level===1?'ASK_SOCRATIC_QUESTION':request.level===2?'GIVE_DIRECTIONAL_HINT':'PROVIDE_STRUCTURED_SUPPORT';
  return {state,action,recommendation:state.strongerSupportRecommended?(request.level+1) as SupportLevel:state.fadingRecommended?(request.level-1) as SupportLevel:undefined,reason:state.strongerSupportRecommended?'stronger':state.fadingRecommended?'fade':undefined,challengeEligible:state.aiChallengeEligible};
 }
 
@@ -48,5 +55,5 @@ export function applySupportChoice(current:SupportLevel,recommended:SupportLevel
 /** Only engine-owned values enter provider instructions; raw task IDs stay in user data. */
 export function providerStrategy(request:ChatRequest) {
  const d=decidePedagogicalAction(request);
- return {action:d.action,stage:request.stage,supportLevel:request.level,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
+ return {action:d.action,stage:request.stage,supportLevel:request.level,condition:(request.research??conditionConfig()).condition,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
 }

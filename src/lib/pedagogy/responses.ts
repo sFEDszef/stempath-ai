@@ -30,6 +30,7 @@ const frames:Record<StageId,[string,string]>={
  reflect:['I used to think ___; evidence ___; advice I checked ___; now I think ___.','我原来认为___；证据___；我检查的建议___；现在认为___。']
 };
 export function adaptiveDemo(request:ChatRequest):CoachResponse {
+ if(request.research?.condition==='NO_AI')return {text:'',suggestions:[],mode:'demo'};
  const decision=decidePedagogicalAction(request), s=decision.state, zh=s.language==='zh',i=zh?1:0;
  const context=request.task.successCriteria?.[0]??request.task.objectives?.[0]??request.task.description.slice(0,180);
  let text:string;

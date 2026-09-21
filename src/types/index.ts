@@ -25,6 +25,7 @@ export interface ChatRequest {
   mode?: "auto" | "demo";
   intent?: "chat" | "challenge" | "evaluate-claim" | "support-change";
   claim?: string;
+  research?: import("@/lib/research/config").ResearchConfig;
 }
 export interface CoachResponse {
   text: string;

@@ -1,8 +1,8 @@
-# STEMPath AI v0.4 — Adaptive Scaffolding Engine
+# STEMPath AI v0.5 — Research-Ready Interaction & Experiment Layer
 
 **Think · Explore · Build · Grow**
 
-Deployment status: this is a server-capable Next.js app, with validation-only GitHub Actions. See [deployment architecture and the Pages audit](docs/deployment.md). Vercel is not configured yet.
+Deployment status: this is a server-capable Next.js app, with validation-only GitHub Actions. See [deployment architecture and the Pages audit](docs/deployment.md). Production is connected to Vercel.
 
 A task-dynamic STEM learning workspace with seven reusable pedagogical stages, learner-controlled support and critical evaluation of AI. The original white, blue and green three-column interface is retained.
 
@@ -59,7 +59,7 @@ See [the pedagogical matrix](docs/pedagogy.md) for student/coach responsibilitie
 
 ## Storage and research boundaries
 
-Active task, current stage, completion, support and text records persist in versioned sessionStorage for the current tab. Chat and image previews stay in memory and reset on reload. Notes use task-scoped localStorage; the original demo notebook is still readable. No database, student account, research event collection or analytics has been added. Browser storage is fallible and is not a research archive.
+Active task, current stage, completion, support and text records persist in versioned sessionStorage for the current tab. Chat and image previews stay in memory and reset on reload. Notes use task-scoped localStorage; the original demo notebook is still readable. No database, student account or remote analytics has been added. v0.5 records anonymous research events locally. Browser storage is fallible and is not a research archive.
 
 Images remain local previews; AI does not analyze them. In real AI mode, recent text and records are sent to OpenAI through the server. Only server code reads `OPENAI_API_KEY`; `.env.example` remains blank. No credentials are needed for the demo or tests. `store:false` does not change provider retention policies.
 
@@ -74,3 +74,7 @@ For v0.4, prioritize reviewed cross-task coaching evaluations and learner-contro
 ## Adaptive scaffolding
 
 See [v0.4 engine rules, storage, debug mode and limitations](docs/adaptive-scaffolding.md). The coach now recommends stronger support after repeated uncertainty, invites optional fading after independent reasoning, and makes AI Challenge contextual. All behavior works without an API key.
+
+## Local research workflow
+
+Open `/?research=1` for condition assignment, seeded tasks, local session traces and JSON/CSV exports. Text capture defaults OFF. See [v0.5 research layer, privacy, limitations and pilot workflow](docs/research-layer.md). Normal student UI hides the research panel.
