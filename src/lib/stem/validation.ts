@@ -29,6 +29,7 @@ export function parseChatRequest(input:unknown):ChatRequest {
  if(!Array.isArray(v.completed)||v.completed.length>7||!v.completed.every(id=>stageIds.includes(id)))throw new Error('Invalid progress');
  if(v.mode!==undefined&&!['auto','demo'].includes(v.mode as string))throw new Error('Invalid mode');
  if(v.intent!==undefined&&!['chat','challenge','evaluate-claim','support-change'].includes(v.intent as string))throw new Error('Invalid intent');
+ if(v.previousLevel!==undefined&&(![1,2,3].includes(v.previousLevel as number)||v.intent!=='support-change'))throw new Error('Invalid previous level');
  if(v.claim!==undefined&&!text(v.claim,4000))throw new Error('Invalid claim');
- return {research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
+ return {...(v.previousLevel===undefined?{}:{previousLevel:v.previousLevel as ChatRequest['level']}),research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
 }

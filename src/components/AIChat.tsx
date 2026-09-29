@@ -4,6 +4,7 @@ import { ChatMessage } from "./ChatMessage";
 import { supportLabels } from "@/data/challenge";
 import type { Message, Stage, SupportLevel } from "@/types";
 export function AIChat({
+  recommendation,
   mode,
   coachDisabled=false, supportDisabled=false, sessionFinished=false,
   stage,
@@ -18,6 +19,7 @@ export function AIChat({
   error,
   onRetry,
 }: {
+  recommendation?: import("react").ReactNode;
   mode?: "ai"|"demo";
   coachDisabled?:boolean; supportDisabled?:boolean; sessionFinished?:boolean;
   error?: {message:string; retryable:boolean};
@@ -114,6 +116,7 @@ export function AIChat({
         )}
         {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{error.message}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>Retry / 重试</button></div>}</div></div>}
       </div>
+      {!coachDisabled&&recommendation}
       {!coachDisabled&&<div className="composer-area">
         <form
           onSubmit={(e) => {

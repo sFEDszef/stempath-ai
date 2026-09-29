@@ -81,7 +81,7 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     if(recommendationKey&&suggestionRef.current!==recommendationKey){const fade=adaptive.decision.reason==='fade';researchEvent(fade?'FADING_SUGGESTED':'ESCALATION_SUGGESTED',{supportRecommendation:adaptive.decision.recommendation,fadingSuggested:fade,escalationSuggested:!fade});}
     suggestionRef.current=recommendationKey;
   },[recommendationKey,adaptive.decision.reason,adaptive.decision.recommendation,researchEvent]);
-  function changeLevel(next:SupportLevel){if(!manualSupport)return;research.support(next,'STUDENT');setLevel(next);}
+  function changeLevel(next:SupportLevel){if(!manualSupport||next===level||pendingRef.current.has(active))return;research.support(next,'STUDENT');setLevel(next);void deliver({...adaptiveRequest,level:next,previousLevel:level,intent:'support-change',message:lang==='zh'?'请调整帮助。':'Please adjust the guidance.'});}
   function recordArtifact(field:string,value:string){const key=`${active}:${field}`;if(lastArtifacts.current[key]===value||(!value&&!lastArtifacts.current[key]))return;lastArtifacts.current[key]=value;research.artifact(active,field,value);}
 
   function completeStage(force=false){
@@ -92,12 +92,13 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     setCompleted(prev=>[...prev,active]);setCompletionWarning([]);research.complete(active,true);
   }
   function chooseSupport(accept:boolean){
+    if(!adaptive.showRecommendation||pendingRef.current.has(active)||finished)return;
     const fade=adaptive.decision.reason==='fade';
     research.event(fade?(accept?'FADING_ACCEPTED':'FADING_REJECTED'):(accept?'ESCALATION_ACCEPTED':'ESCALATION_REJECTED'),{supportRecommendation:adaptive.decision.recommendation,fadingAccepted:fade?accept:undefined,escalationAccepted:!fade?accept:undefined});
     const next=adaptive.resolveRecommendation(accept);
     if(accept&&next){research.support(next,'SYSTEM_RECOMMENDATION');setLevel(next);
       const history=messages.slice(-12).map(({role,text})=>({role,text}));
-      void deliver({...adaptiveRequest,level:next,history,intent:'support-change',message:lang==='zh'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
+      void deliver({...adaptiveRequest,level:next,previousLevel:level,history,intent:'support-change',message:lang==='zh'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
     }
   }
   useEffect(() => {
@@ -232,8 +233,9 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
           <ChallengeCard task={task} />
           {coachEnabled&&<div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo responses · no AI call':responseMode==='ai'?'Connected to OpenAI':'Practice with Demo when AI is unavailable.'}</span></div>}
           <AIChat
+            recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>:undefined}
             coachDisabled={!coachEnabled||finished}
-            supportDisabled={!manualSupport}
+            supportDisabled={!manualSupport||pending.includes(active)}
             sessionFinished={finished}
             mode={responseMode??(mode==="demo"?"demo":undefined)}
             stage={stage}
@@ -283,9 +285,8 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             onRemove={removeArtifact}
           />
           </details>
-          {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport}/>}
+          {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport||pending.includes(active)}/>}
           {coachEnabled&&<p className="support-status" aria-live="polite">{lang==='zh'?'AI 支持':'AI support'}: {adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(lang==='zh'?'可以尝试更具体的提示':'A stronger hint is available'):(lang==='zh'?'可以尝试更独立地思考':'Ready to try more independently')):(lang==='zh'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
-          {!finished&&adaptive.showRecommendation&&<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>}
           {!finished&&adaptive.decision.challengeEligible&&<AIChallenge language={lang} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={pending.includes(active)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
 
         </aside>

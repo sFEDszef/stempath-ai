@@ -1,4 +1,4 @@
-# STEMPath AI v0.5 — Research-Ready Interaction & Experiment Layer
+# STEMPath AI v0.5.1 — Adaptive UX Validation
 
 **Think · Explore · Build · Grow**
 
@@ -78,3 +78,9 @@ See [v0.4 engine rules, storage, debug mode and limitations](docs/adaptive-scaff
 ## Local research workflow
 
 Open `/?research=1` for condition assignment, seeded tasks, local session traces and JSON/CSV exports. Text capture defaults OFF. See [v0.5 research layer, privacy, limitations and pilot workflow](docs/research-layer.md). Normal student UI hides the research panel.
+
+## Adaptive UX (v0.5.1)
+
+Optional support recommendations appear beside the chat input. Adaptive support offers escalation after two consecutive uncertainty/help signals. At Level 2 or 3, two consecutive productive responses, including recent reasoning, evidence or critical evaluation, can offer fading. Accepting a recommendation or manually changing support immediately requests guidance at the chosen level; no level changes automatically.
+
+Level 1 uses one Socratic question, Level 2 adds a directional hint, and Level 3 uses task-informed choices or partial frames. LOW disables proactive recommendations; HIGH starts at Level 3; NO_AI remains unchanged. These are prototype heuristics, not validated measures of learning.
