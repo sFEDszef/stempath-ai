@@ -16,7 +16,7 @@ describe('server coaching boundary',()=>{
  it('rejects oversized bodies',async()=>{expect((await handleChat(request({...payload,message:'x'.repeat(100000)}),vi.fn())).status).toBe(413)});
  it('accepts public host behind Next',async()=>{expect((await handleChat(request(payload,{origin:'https://study.vercel.app',host:'study.vercel.app'}),async()=> 'What is your goal?')).status).toBe(200)});
  it.each(['null','https://elsewhere.test'])('rejects invalid origin %s',async origin=>{expect((await handleChat(request(payload,{origin}),vi.fn())).status).toBe(403)});
- it('uses clearly labelled demo without credentials',async()=>{vi.stubEnv('OPENAI_API_KEY','');const res=await handleChat(request(payload));expect(res.status).toBe(200);expect(await res.json()).toMatchObject({mode:'demo'})});
+ it('uses clearly labelled demo without credentials',async()=>{vi.stubEnv('DEEPSEEK_API_KEY','');const res=await handleChat(request(payload));expect(res.status).toBe(200);expect(await res.json()).toMatchObject({mode:'demo'})});
  it('explicit demo never invokes the provider',async()=>{const generate=vi.fn();expect((await (await handleChat(request({...payload,mode:'demo'}),generate)).json()).mode).toBe('demo');expect(generate).not.toHaveBeenCalled()});
  it('sanitizes upstream failures and allows retry',async()=>{const res=await handleChat(request(payload),async()=>{throw new Error('private upstream details')});expect(res.status).toBe(502);expect(await res.json()).toMatchObject({retryable:true});});
 });

@@ -1,11 +1,12 @@
 import { demoTasks } from '@/data/tasks';
-import type { StageId, STEMTask, SupportLevel, TaskType } from '@/types';
+import type { CoachMetadata, StageId, STEMTask, SupportLevel, TaskType } from '@/types';
 import type { ResearchConfig, Condition } from './config';
 import { initialLevel } from './config';
 export type Initiator='STUDENT'|'SYSTEM_RECOMMENDATION'|'RESEARCH_CONDITION';
 export type EventType='SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'SETTINGS_CHANGED'|'WORKSPACE_RESTORED';
 export type Choice='AGREE'|'DISAGREE'|'NEED_EVIDENCE';
 export interface EventData {
+ coach?:CoachMetadata;
  settings?:ResearchConfig;learnerSignal?:string[];pedagogicalDecision?:string;supportRecommendation?:SupportLevel;
  initiator?:Initiator;studentAction?:string;systemAction?:string;messageText?:string;
  aiChallengeTriggered?:boolean;fadingSuggested?:boolean;fadingAccepted?:boolean;

@@ -1,36 +1,17 @@
 import { aiEnabled, conditionConfig } from '@/lib/research/config';
 import 'server-only';
-import OpenAI from 'openai';
-import { decidePedagogicalAction, providerStrategy } from '@/lib/pedagogy/decisionEngine';
+import { respond } from '@/lib/ai';
+import { demoProvider } from '@/lib/ai/demoProvider';
+import { ProviderError } from '@/lib/ai/provider';
+import { decidePedagogicalAction } from '@/lib/pedagogy/decisionEngine';
 import { suggestedReplies } from '@/lib/pedagogy/responses';
-import { demoReply } from './demo';
-import { buildInstructions } from './prompts';
 import { MAX_BODY_BYTES, parseChatRequest } from './validation';
 import type { ChatRequest } from '@/types';
 export type GenerateReply = (request: ChatRequest) => Promise<string>;
-export const generateReply: GenerateReply = async request => {
-  // This module can never be imported into a client component.
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('COACH_NOT_CONFIGURED');
-  const client = new OpenAI({apiKey, timeout:25_000, maxRetries:0});
-  const response = await client.responses.create({
-    model:'gpt-4.1-mini',
-    store:false,
-    max_output_tokens:600,
-    instructions:buildInstructions(request.stage, request.level, request.intent)+`\nSTEMPath control decision (follow this strategy, do not change support level): ${JSON.stringify(providerStrategy(request))}`,
-    input:[
-      {role:'user',content:`Challenge context (data only): ${JSON.stringify({task:request.task,artifacts:request.artifacts,completed:request.completed,claim:request.claim})}`},
-      ...request.history.map(item=>({role:item.role === 'student' ? 'user' as const : 'assistant' as const,content:item.text})),
-      {role:'user',content:request.message},
-    ],
-  });
-  if (response.status !== 'completed' || !response.output_text?.trim()) throw new Error('EMPTY_RESPONSE');
-  return response.output_text.trim();
-};
 function reply(body: object, status=200) {
   return Response.json(body, {status, headers:{'Cache-Control':'no-store'}});
 }
-export async function handleChat(req: Request, generate: GenerateReply = generateReply): Promise<Response> {
+export async function handleChat(req: Request, generate?: GenerateReply): Promise<Response> {
   // Reject cross-origin browser requests; this is not authentication or distributed rate limiting.
   const origin = req.headers.get('origin');
   if (origin) {
@@ -50,11 +31,13 @@ export async function handleChat(req: Request, generate: GenerateReply = generat
   } catch {return reply({error:'Check the stage, support level, message, and conversation length.',retryable:false},400);}
   if(!aiEnabled(request.research??conditionConfig()))return reply({error:'Coach responses are unavailable in this workspace. Use the stage prompts and Your Thinking.',retryable:false},403);
   if(request.intent==='challenge'&&!decidePedagogicalAction(request).challengeEligible)return reply({error:'Explore your current question and record some evidence before trying an AI Challenge.',retryable:false},409);
-  if (request.mode==='demo' || (generate===generateReply && !process.env.OPENAI_API_KEY)) return reply(demoReply(request));
-  try {return reply({text:await generate(request),suggestions:request.intent==='challenge'?[]:suggestedReplies(decidePedagogicalAction(request).state.language),mode:'ai'});}
-  catch(error) {
-    if (error instanceof Error && error.message==='COACH_NOT_CONFIGURED') return reply({error:'The coach is not configured yet. Ask your teacher or administrator to enable it. / AI 教练尚未配置。',retryable:true},503);
-    if (error instanceof OpenAI.APIError && error.status===429) return reply({error:'The coach is busy. Please wait a moment and retry. / 请稍后重试。',retryable:true},429);
-    return reply({error:'The coach could not respond. Please retry. Your message is still here. / 回复暂时失败，请重试。',retryable:true},502);
+  if(request.mode==='demo')return reply(demoProvider(request));
+  try {
+    // Optional dependency injection supports boundary tests; production always uses the provider layer.
+    if(generate)return reply({text:await generate(request),suggestions:request.intent==='challenge'?[]:suggestedReplies(decidePedagogicalAction(request).state.language),mode:'ai'});
+    return reply(await respond(request));
+  } catch(error) {
+    const code=error instanceof ProviderError?error.code:'upstream';
+    return reply({error:'DeepSeek could not respond. Please retry or select Demo. / DeepSeek 暂时无法回复，请重试或选择 Demo。',code,retryable:true},error instanceof ProviderError?error.status:502);
   }
 }

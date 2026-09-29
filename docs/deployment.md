@@ -25,4 +25,4 @@ GitHub Pages cannot host this full application because it does not execute the s
 
 ## Future Vercel work (not configured yet)
 
-Import the GitHub repository as a Next.js project, select a supported Node runtime matching CI, and use the existing build/start architecture without a Pages base path or static output directory. Verify `/api/chat` and demo behavior in a preview deployment. Add server-only `OPENAI_API_KEY` only when real AI is wanted; no key is required for the demo or validation. Configure a custom domain and DNS later. Authentication, database and billing require their own implementation and environment setup when introduced.
+Import the GitHub repository as a Next.js project, select a supported Node runtime matching CI, and use the existing build/start architecture without a Pages base path or static output directory. Verify `/api/chat` and demo behavior in a preview deployment. Add server-only `DEEPSEEK_API_KEY` only when real AI is wanted; no key is required for the demo or validation. Configure a custom domain and DNS later. Authentication, database and billing require their own implementation and environment setup when introduced.

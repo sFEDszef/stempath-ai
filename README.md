@@ -1,4 +1,4 @@
-# STEMPath AI v0.5.1 — Adaptive UX Validation
+# STEMPath AI v0.5.2 — DeepSeek Pilot
 
 **Think · Explore · Build · Grow**
 
@@ -15,7 +15,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-No API key is required. Auto mode uses deterministic Demo responses when server credentials are absent. Demo mode can also be chosen explicitly and never calls OpenAI. If a configured provider fails, an error and retry remain visible; failure is not silently passed off as AI success.
+No API key is required. Auto mode uses deterministic Demo responses when server credentials are absent. Demo mode can also be chosen explicitly and never calls DeepSeek. Auto failures use clearly labeled Demo fallback. Forced DeepSeek failures show a retryable error.
 
 ```sh
 pnpm lint
@@ -46,7 +46,7 @@ This validates and dispatches a local event consumed by the mounted TaskWorkspac
 - `src/lib/stem/supportLevels.ts`: Level 1 questions, Level 2 directional hints, Level 3 partial scaffolds.
 - `src/lib/stem/prompts.ts`: trusted teaching rules, stage and support composition; treats every task field, claim and record as untrusted data.
 - `src/lib/stem/validation.ts`: bounded server request and record validation.
-- `src/lib/stem/handler.ts`: official OpenAI Responses API, `store:false`, safe errors and missing-key Demo fallback.
+- `src/lib/stem/handler.ts`: validated same-origin API boundary; `src/lib/ai/` owns DeepSeek Chat Completions, safe errors and explicit Demo fallback.
 - `src/lib/stem/demo.ts`: deterministic, bilingual, task-aware practice responses and claims; no model reasoning.
 - `src/lib/pedagogy/decisionEngine.ts`: optional fading invitation, never a mastery judgement.
 - `src/components/TaskWorkspace.tsx`, `TaskLoader.tsx`: active-task lifecycle and input.
@@ -61,7 +61,7 @@ See [the pedagogical matrix](docs/pedagogy.md) for student/coach responsibilitie
 
 Active task, current stage, completion, support and text records persist in versioned sessionStorage for the current tab. Chat and image previews stay in memory and reset on reload. Notes use task-scoped localStorage; the original demo notebook is still readable. No database, student account or remote analytics has been added. v0.5 records anonymous research events locally. Browser storage is fallible and is not a research archive.
 
-Images remain local previews; AI does not analyze them. In real AI mode, recent text and records are sent to OpenAI through the server. Only server code reads `OPENAI_API_KEY`; `.env.example` remains blank. No credentials are needed for the demo or tests. `store:false` does not change provider retention policies.
+Images remain local previews; AI does not analyze them. In real AI mode, recent text and records are sent to DeepSeek through the server. Only server code reads `DEEPSEEK_API_KEY`; `.env.example` remains blank. No credentials are needed for the demo or tests. Provider data retention policies apply; do not enter personal or sensitive information.
 
 Support fading is an opt-in heuristic, not adaptive assessment. Demo replies are intentionally limited templates and may repeat. Task classification is approximate. AI Challenge claims are unverified prompts for investigation; students must reason from evidence. Real model behavior needs pedagogical evaluation before research use.
 
@@ -84,3 +84,7 @@ Open `/?research=1` for condition assignment, seeded tasks, local session traces
 Optional support recommendations appear beside the chat input. Adaptive support offers escalation after two consecutive uncertainty/help signals. At Level 2 or 3, two consecutive productive responses, including recent reasoning, evidence or critical evaluation, can offer fading. Accepting a recommendation or manually changing support immediately requests guidance at the chosen level; no level changes automatically.
 
 Level 1 uses one Socratic question, Level 2 adds a directional hint, and Level 3 uses task-informed choices or partial frames. LOW disables proactive recommendations; HIGH starts at Level 3; NO_AI remains unchanged. These are prototype heuristics, not validated measures of learning.
+
+## DeepSeek pilot
+
+See [provider architecture, modes, validation and limitations](docs/deepseek-pilot.md). Production-only secrets do not enable Preview or local AI.

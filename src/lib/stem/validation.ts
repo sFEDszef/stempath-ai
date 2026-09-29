@@ -27,7 +27,7 @@ export function parseChatRequest(input:unknown):ChatRequest {
  if(!stageIds.includes(v.stage as StageId)||![1,2,3].includes(v.level as number)||!text(v.message,MAX_TEXT)||!Array.isArray(v.history)||v.history.length>MAX_HISTORY)throw new Error('Invalid request');
  const history=v.history.map((item:unknown)=>{if(!item||typeof item!=='object')throw new Error('Invalid history');const m=item as Record<string,unknown>;if(!['student','assistant'].includes(m.role as string)||!text(m.text,MAX_TEXT))throw new Error('Invalid history');return {role:m.role as 'student'|'assistant',text:m.text};});
  if(!Array.isArray(v.completed)||v.completed.length>7||!v.completed.every(id=>stageIds.includes(id)))throw new Error('Invalid progress');
- if(v.mode!==undefined&&!['auto','demo'].includes(v.mode as string))throw new Error('Invalid mode');
+ if(v.mode!==undefined&&!['auto','deepseek','demo'].includes(v.mode as string))throw new Error('Invalid mode');
  if(v.intent!==undefined&&!['chat','challenge','evaluate-claim','support-change'].includes(v.intent as string))throw new Error('Invalid intent');
  if(v.previousLevel!==undefined&&(![1,2,3].includes(v.previousLevel as number)||v.intent!=='support-change'))throw new Error('Invalid previous level');
  if(v.claim!==undefined&&!text(v.claim,4000))throw new Error('Invalid claim');

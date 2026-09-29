@@ -9,6 +9,7 @@ export interface Stage {
   prompts: [string, string, string];
 }
 export interface Message {
+  metadata?: CoachMetadata;
   id: string;
   role: "assistant" | "student";
   text: string;
@@ -22,13 +23,14 @@ export interface ChatRequest {
   task: STEMTask;
   artifacts: LearningArtifacts;
   completed: StageId[];
-  mode?: "auto" | "demo";
+  mode?: "auto" | "deepseek" | "demo";
   intent?: "chat" | "challenge" | "evaluate-claim" | "support-change";
   claim?: string;
   previousLevel?: SupportLevel;
   research?: import("@/lib/research/config").ResearchConfig;
 }
 export interface CoachResponse {
+  metadata?: CoachMetadata;
   text: string;
   suggestions: string[];
   mode: "ai" | "demo";
@@ -68,4 +70,11 @@ export interface StagePedagogy {
   questions: [string, string, string];
   fields: string[];
   replies: string[];
+}
+
+export interface CoachMetadata {
+ provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
+ STEMPathVersion:'0.5.2';promptVersion:'deepseek-v1';
+ tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
+ fallbackReason?:string;
 }

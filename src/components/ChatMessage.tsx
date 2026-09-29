@@ -35,7 +35,7 @@ export function ChatMessage({
         {ai ? <Sparkles size={15} /> : <UserRound size={15} />}
       </div>
       <div className="message-body">
-        <span className="message-author">{ai ? "STEM Coach" : "You"}</span>
+        <span className="message-author">{ai ? `STEM Coach${message.metadata ? ` · ${message.metadata.provider==='deepseek'?'DeepSeek':'Demo'}${message.metadata.fallbackReason?' (fallback)':''}` : ''}` : "You"}</span>
         <div
           className="message-bubble"
           lang={/[\u3400-\u9fff]/.test(message.text) ? "zh-CN" : "en"}

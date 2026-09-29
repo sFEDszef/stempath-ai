@@ -45,7 +45,7 @@ export default function Workspace({task,onLoadTask,research,researchVisible,onRe
   const stages=getStages(task);
   const [records,setRecords]=useState<Thinking>({});
   const [restored,setRestored]=useState(false);
-  const [mode,setMode]=useState<'auto'|'demo'>('auto');
+  const [mode,setMode]=useState<'auto'|'deepseek'|'demo'>('auto');
   const [responseMode,setResponseMode]=useState<'ai'|'demo'|undefined>();
   const [completionWarning,setCompletionWarning]=useState<string[]>([]);
   const alive=useRef(true);
@@ -158,7 +158,7 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
     try {
       const response = await apiCoach.respond(request);
       if(!alive.current)return;
-      research.event('AI_RESPONSE',{messageText:response.text,systemAction:response.mode.toUpperCase()},requestStage,request.level);
+      research.event('AI_RESPONSE',{messageText:response.text,systemAction:response.mode.toUpperCase(),coach:response.metadata},requestStage,request.level);
       setResponseMode(response.mode);
       setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response}]}));
     } catch (error) {
@@ -231,13 +231,13 @@ You can use English or Chinese.`,suggestions:suggestedReplies('en')}] });
             <span>{task.title}</span><button onClick={onLoadTask}>Load STEM Challenge</button>
           </div>
           <ChallengeCard task={task} />
-          {coachEnabled&&<div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo responses · no AI call':responseMode==='ai'?'Connected to OpenAI':'Practice with Demo when AI is unavailable.'}</span></div>}
+          {coachEnabled&&<div className="coach-mode"><label>Coach mode <select aria-label="Coach mode" value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">Auto · AI when available</option><option value="deepseek">DeepSeek · real AI only</option><option value="demo">Demo · local practice</option></select></label><span>{responseMode==='demo'?'Demo response · local guidance':responseMode==='ai'?'DeepSeek · real AI response':mode==='deepseek'?'DeepSeek only · errors allow retry.':'Practice with Demo when AI is unavailable.'}</span></div>}
           <AIChat
             recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={adaptive.decision} onChoice={chooseSupport} disabled={pending.includes(active)}/>:undefined}
             coachDisabled={!coachEnabled||finished}
             supportDisabled={!manualSupport||pending.includes(active)}
             sessionFinished={finished}
-            mode={responseMode??(mode==="demo"?"demo":undefined)}
+            mode={responseMode??(mode==="auto"?undefined:mode)}
             stage={stage}
             level={level}
             messages={messages.map(m=>m.suggestions?{...m,suggestions:suggestedReplies(lang)}:m)}

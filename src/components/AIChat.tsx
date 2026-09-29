@@ -20,7 +20,7 @@ export function AIChat({
   onRetry,
 }: {
   recommendation?: import("react").ReactNode;
-  mode?: "ai"|"demo";
+  mode?: "ai"|"demo"|"deepseek";
   coachDisabled?:boolean; supportDisabled?:boolean; sessionFinished?:boolean;
   error?: {message:string; retryable:boolean};
   onRetry: () => void;
@@ -66,7 +66,7 @@ export function AIChat({
           </div>
         </div>
         <span className="mock-badge">
-          <i /> {coachDisabled ? "Guided workspace" : mode === "ai" ? "OpenAI" : mode === "demo" ? "Demo" : "Auto"}
+          <i /> {coachDisabled ? "Guided workspace" : mode === "ai" ? "DeepSeek" : mode === "demo" ? "Demo" : mode === "deepseek" ? "DeepSeek selected" : "Auto"}
         </span>
       </div>
       <div className="chat-context">

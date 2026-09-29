@@ -2,7 +2,7 @@
 
 ## Control pipeline
 
-Student turn and current-stage records → deterministic signals → learner indicators → teaching decision → Demo or OpenAI language generation. `src/lib/pedagogy/decisionEngine.ts` is shared by the UI and server. The server recomputes the decision from validated task-local history rather than accepting client instructions. The model must follow the selected level and engine strategy. `/api/chat`, normal Next.js builds, dynamic tasks and credential-free Demo remain intact.
+Student turn and current-stage records → deterministic signals → learner indicators → teaching decision → Demo or DeepSeek language generation. `src/lib/pedagogy/decisionEngine.ts` is shared by the UI and server. The server recomputes the decision from validated task-local history rather than accepting client instructions. The model must follow the selected level and engine strategy. `/api/chat`, normal Next.js builds, dynamic tasks and credential-free Demo remain intact.
 
 ## Transparent indicators
 
@@ -22,7 +22,7 @@ Stage completion uses a soft check of the first three relevant records. Students
 
 ## Language, storage and debug
 
-Language is inferred from the latest student turn, ignoring quoted AI claims. Short English/Chinese Demo responses and suggested replies follow it; task quotations retain their original language. This is not a translation system. Demo and OpenAI use the same engine, with different natural-language providers. Live model quality is not verified by mock SDK tests.
+Language is inferred from the latest student turn, ignoring quoted AI claims. Short English/Chinese Demo responses and suggested replies follow it; task quotations retain their original language. This is not a translation system. Demo and DeepSeek use the same engine, with different natural-language providers. Live model quality is not verified by mock SDK tests.
 
 The bounded learner model is derived from recent task/stage conversation (up to 12 student turns, with the API limited to 12 recent messages). Conversations and adaptive counters are in browser memory and reset on reload/task remount; existing task/progress/artifact session storage and notebook storage are preserved. Support choices are recorded locally, including accepted/rejected recommendations and the selected target level. No database is added.
 
