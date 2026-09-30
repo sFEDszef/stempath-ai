@@ -16,6 +16,8 @@ export interface Message {
   suggestions?: string[];
 }
 export interface ChatRequest {
+  interfaceLanguage?: "zh-CN"|"en";
+  taskLanguage?: "zh-CN"|"en";
   stage: StageId;
   level: SupportLevel;
   message: string;
@@ -50,6 +52,14 @@ export interface STEMTask {
   title: string;
   description: string;
   type: TaskType;
+  subject?: string;
+  gradeLevel?: string;
+  lessonNumber?: string;
+  estimatedMinutes?: number;
+  teacherNotes?: string;
+  safetyNotes?: string;
+  tags?: string[];
+  translations?: Partial<Record<"zh-CN"|"en",TaskTranslation>>;
   context?: string;
   objectives?: string[];
   constraints?: string[];
@@ -74,7 +84,9 @@ export interface StagePedagogy {
 
 export interface CoachMetadata {
  provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
- STEMPathVersion:'0.5.2';promptVersion:'deepseek-v1';
+ STEMPathVersion:'0.5.3';promptVersion:'deepseek-v1';
  tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
  fallbackReason?:string;
 }
+
+export type TaskTranslation=Partial<Pick<STEMTask,"title"|"description"|"context"|"objectives"|"constraints"|"successCriteria"|"availableMaterials"|"relevantDomains"|"subject"|"gradeLevel"|"safetyNotes">>;

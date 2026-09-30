@@ -26,6 +26,7 @@ export function useResearchSession(){
  const finish=useCallback(()=>update(s=>finishSession(s)),[update]);
  const textStorage=useCallback((enabled:boolean)=>update(s=>setTextStorage(s,enabled)),[update]);
  const language=useCallback((value:'en'|'zh')=>update(s=>s.language===value?s:{...s,language:value}),[update]);
+ const interfaceLanguage=useCallback((value:"zh-CN"|"en",taskLanguage:"zh-CN"|"en")=>update(s=>({...s,interfaceLanguage:value,taskLanguage})),[update]);
  const configure=useCallback((config:ResearchConfig)=>update(s=>recordEvent({...s,config},'SETTINGS_CHANGED',{systemAction:'POLICY_UPDATED',settings:config})),[update]);
  const clear=useCallback((all:boolean)=>{
   try{if(all){for(const key of Object.keys(localStorage))if(key.startsWith(STORAGE_PREFIX)||key==='stempath-trace-v4')localStorage.removeItem(key);}else if(current.current)localStorage.removeItem(STORAGE_PREFIX+current.current.sessionId);
@@ -33,6 +34,6 @@ export function useResearchSession(){
   catch{setStorageNotice('Could not clear persistent storage. Check browser storage settings.');}
   current.current=null;setSession(null);
  },[]);
- return {session,current,start,assign,event,stage,support,artifact,complete,finish,end,textStorage,language,configure,clear,storageNotice,savedCount};
+ return {session,current,start,assign,event,stage,support,artifact,complete,finish,end,textStorage,language,interfaceLanguage,configure,clear,storageNotice,savedCount};
 }
 export type ResearchController=ReturnType<typeof useResearchSession>;

@@ -1,9 +1,11 @@
+import {useI18n} from '@/lib/i18n';
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, ImagePlus, ArrowUp, Check, ChevronDown } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
 import { supportLabels } from "@/data/challenge";
 import type { Message, Stage, SupportLevel } from "@/types";
 export function AIChat({
+  researchVisible=false,
   recommendation,
   mode,
   coachDisabled=false, supportDisabled=false, sessionFinished=false,
@@ -19,6 +21,7 @@ export function AIChat({
   error,
   onRetry,
 }: {
+  researchVisible?:boolean;
   recommendation?: import("react").ReactNode;
   mode?: "ai"|"demo"|"deepseek";
   coachDisabled?:boolean; supportDisabled?:boolean; sessionFinished?:boolean;
@@ -34,6 +37,8 @@ export function AIChat({
   complete: boolean;
   onLevel: (level: SupportLevel) => void;
 }) {
+ const {t}=useI18n();
+
   const [input, setInput] = useState("");
   const log = useRef<HTMLDivElement>(null);
   const previous = useRef(messages.length);
@@ -61,30 +66,27 @@ export function AIChat({
             <Sparkles size={20} />
           </span>
           <div>
-            <h2>AI STEM Coach</h2>
-            <p>Your thinking partner, every step of the way.</p>
+            <h2>{t("AI STEM Coach")}</h2>
+            <p>{t("Your thinking partner, every step of the way.")}</p>
           </div>
         </div>
-        <span className="mock-badge">
-          <i /> {coachDisabled ? "Guided workspace" : mode === "ai" ? "DeepSeek" : mode === "demo" ? "Demo" : mode === "deepseek" ? "DeepSeek selected" : "Auto"}
-        </span>
+        {researchVisible&&<span className="mock-badge">
+          <i /> {coachDisabled ? t("Guided workspace") : mode === "ai" ? t("DeepSeek") : mode === "demo" ? t("Demo") : mode === "deepseek" ? t("DeepSeek selected") : t("Auto")}
+        </span>}
       </div>
       <div className="chat-context">
-        <span>
-          Current Stage <strong>{stage.title}</strong>
+        <span>{t("Current Stage")}<strong>{stage.title}</strong>
         </span>
-        <label>
-          Current Support Level{" "}
+        <label>{t("Current Support Level")}{t(" ")}
           <span className="support-select">
             <select
-              aria-label="Current Support Level"
+              aria-label={t("Current Support Level")}
               disabled={supportDisabled||coachDisabled}
               value={level}
               onChange={(e) => onLevel(Number(e.target.value) as SupportLevel)}
             >
               {([1, 2, 3] as const).map((n) => (
-                <option value={n} key={n}>
-                  Level {n}
+                <option value={n} key={n}>{t("Level")}{n}
                 </option>
               ))}
             </select>
@@ -96,14 +98,15 @@ export function AIChat({
         className="chat-log"
         ref={log}
         role="log"
-        aria-label="Coach conversation"
+        aria-label={t("Coach conversation")}
         aria-live="polite"
       >
-        <div className="chat-date">LET’S EXPLORE TOGETHER</div>
-        {coachDisabled&&<p className="static-stage-prompt">{sessionFinished?"Your session is complete. Review your thinking records below.":`Use Your Thinking to explore this stage: ${stage.question}`}</p>}
+        <div className="chat-date">{t("LET’S EXPLORE TOGETHER")}</div>
+        {coachDisabled&&<p className="static-stage-prompt">{sessionFinished?t("Your session is complete. Review your thinking records below."):`${t("Your Thinking")}: ${stage.question}`}</p>}
         {!coachDisabled&&messages.map((message) => (
           <ChatMessage
             key={message.id}
+            researchVisible={researchVisible}
             message={message}
             onReply={onSend}
             disabled={busy}
@@ -111,10 +114,10 @@ export function AIChat({
         ))}
         {!coachDisabled&&busy && (
           <div className="thinking">
-            <Sparkles size={15} /> Your coach is thinking<span>•••</span>
+            <Sparkles size={15} />{t("Your coach is thinking")}<span>{t("•••")}</span>
           </div>
         )}
-        {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{error.message}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>Retry / 重试</button></div>}</div></div>}
+        {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{researchVisible?error.message:t("The coach could not respond. Please retry.")}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>{t("Retry / 重试")}</button></div>}</div></div>}
       </div>
       {!coachDisabled&&recommendation}
       {!coachDisabled&&<div className="composer-area">
@@ -129,15 +132,15 @@ export function AIChat({
             className="upload-chat"
             type="button"
             onClick={onUpload}
-            aria-label="Upload image to artifacts"
+            aria-label={t("Upload image to artifacts")}
           >
             <ImagePlus size={20} />
           </button>
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Share your ideas… 用你喜欢的语言表达"
-            aria-label="Message to AI Coach"
+            placeholder={t("Share your ideas… 用你喜欢的语言表达")}
+            aria-label={t("Message to AI Coach")}
             rows={1}
             maxLength={4000}
             onKeyDown={(e) => {
@@ -153,7 +156,7 @@ export function AIChat({
           />
           <button
             className="send-button"
-            aria-label="Send message"
+            aria-label={t("Send message")}
             disabled={!input.trim() || busy}
           >
             <ArrowUp size={20} />
@@ -161,17 +164,16 @@ export function AIChat({
         </form>
         <div className="composer-hint">
           <span>
-            <Sparkles size={12} /> A little guidance. Your own discoveries.
-          </span>
-          <span>Enter to send</span>
+            <Sparkles size={12} />{t("A little guidance. Your own discoveries.")}</span>
+          <span>{t("Enter to send")}</span>
         </div>
       </div>
       }
       <div className="stage-footer">
-        <span>{coachDisabled?"Space to record your own thinking":supportLabels[level]+" · Space to think for yourself"}</span>
+        <span>{coachDisabled?t("Space to record your own thinking"):t(supportLabels[level])+t(" · Space to think for yourself")}</span>
         <button disabled={sessionFinished} onClick={onComplete} className={complete ? "is-complete" : ""}>
           <Check size={14} />
-          {complete ? "Stage completed" : "Complete stage"}
+          {complete ? t("Stage completed") : t("Complete stage")}
         </button>
       </div>
     </section>

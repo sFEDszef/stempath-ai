@@ -23,7 +23,7 @@ export function readiness(task:STEMTask,stage:StageId,records:LearningArtifacts)
 /** Replays bounded, task-local student turns; no model or network dependency. Scores are indicators, not assessments. */
 export function evaluateLearnerState(request:ChatRequest):LearnerState {
  const turns=[...request.history.filter(m=>m.role==='student').map(m=>m.text),...(request.message.trim()&&request.intent!=='support-change'&&request.intent!=='challenge'?[request.message]:[])].slice(-12);
- let recentReasoning=false, uncertain=0,productive=0,total=0,evidence=0,independent=0,language:Language='en';
+ let recentReasoning=false, uncertain=0,productive=0,total=0,evidence=0,independent=0,language:Language=request.interfaceLanguage==='zh-CN'?'zh':'en';
  let signals=detectSignals('',request.stage); const seen:string[]=[];
  for(const text of turns){signals=detectSignals(text,request.stage,seen);language=languageOf(text.replace(/^Regarding this unverified claim:[\s\S]*?\n\n/,''),language);seen.push(text);
  uncertain=signals.uncertain||signals.empty||signals.repeated?uncertain+1:0;
@@ -56,5 +56,5 @@ export function applySupportChoice(current:SupportLevel,recommended:SupportLevel
 /** Only engine-owned values enter provider instructions; raw task IDs stay in user data. */
 export function providerStrategy(request:ChatRequest) {
  const d=decidePedagogicalAction(request);
- return {...(request.previousLevel===undefined?{}:{previousSupportLevel:request.previousLevel}),action:d.action,stage:request.stage,supportLevel:request.level,condition:(request.research??conditionConfig()).condition,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
+ return {interfaceLanguage:request.interfaceLanguage,taskLanguage:request.taskLanguage,...(request.previousLevel===undefined?{}:{previousSupportLevel:request.previousLevel}),action:d.action,stage:request.stage,supportLevel:request.level,condition:(request.research??conditionConfig()).condition,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
 }

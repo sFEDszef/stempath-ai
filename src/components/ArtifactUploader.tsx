@@ -1,3 +1,4 @@
+import {useI18n} from '@/lib/i18n';
 import { ImagePlus, X, ImageIcon } from "lucide-react";
 import type { Artifact } from "@/types";
 export function ArtifactUploader({
@@ -9,18 +10,16 @@ export function ArtifactUploader({
   onUpload: () => void;
   onRemove: (id: string) => void;
 }) {
+ const {t}=useI18n();
+
   return (
     <section className="rail-section artifacts" id="artifacts">
-      <h2>Your Artifacts</h2>
+      <h2>{t("Your Artifacts")}</h2>
       <button className="upload-zone" onClick={onUpload}>
         <ImagePlus size={25} />
-        <strong>Upload image</strong>
-        <span>
-          Upload your sketch, setup,
-          <br />
-          observations or results.
-        </span>
-        <small>PNG, JPG or WebP · Up to 5 MB</small>
+        <strong>{t("Upload image")}</strong>
+        <span>{t("Upload your sketch, setup,")}<br />{t("observations or results.")}</span>
+        <small>{t("PNG, JPG or WebP · Up to 5 MB")}</small>
       </button>
       {artifacts.length > 0 && (
         <div className="artifact-list">
@@ -48,7 +47,7 @@ export function ArtifactUploader({
           ))}
         </div>
       )}
-      <p className="local-note">Images stay in this browser session.</p>
+      <p className="local-note">{t("Images stay in this browser session.")}</p>
     </section>
   );
 }

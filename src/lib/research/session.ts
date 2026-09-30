@@ -15,11 +15,12 @@ export interface EventData {
  laterRevision?:'ACCEPTED_CLAIM'|'REJECTED_CLAIM'|'UNCERTAIN';challengeId?:string;
 }
 export interface InteractionEvent extends EventData {eventId:string;sessionId:string;timestamp:string;taskId:string;stage:StageId;condition:Condition;supportLevel:SupportLevel;eventType:EventType}
-export interface TaskRun {taskId:string;catalogTaskId?:string;type:TaskType;startedAt:string;completedAt?:string;completedStages:StageId[];title?:string;description?:string}
+export interface TaskRun {taskId:string;taskRunId?:string;definitionId?:string;catalogTaskId?:string;type:TaskType;startedAt:string;completedAt?:string;completedStages:StageId[];title?:string;description?:string}
 export interface StageTiming {taskId:string;stage:StageId;stageEnteredAt:string;stageExitedAt?:string;durationMs:number}
 export interface SupportChange {timestamp:string;taskId:string;stage:StageId;from?:SupportLevel;to:SupportLevel;initiator:Initiator}
 export interface ArtifactRevision {taskId:string;stage:StageId;artifactType:string;version:number;timestamp:string;characterCount:number;text?:string}
 export interface ResearchSession {
+ interfaceLanguage?:"zh-CN"|"en";taskLanguage?:"zh-CN"|"en";
  schemaVersion:5;sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE';condition:Condition;config:ResearchConfig;
  language:'en'|'zh';currentStage:StageId;supportLevel:SupportLevel;taskId:string;completedStages:StageId[];
  interactionCount:number;events:InteractionEvent[];tasks:TaskRun[];stageTimings:StageTiming[];
@@ -27,9 +28,11 @@ export interface ResearchSession {
 }
 export const stamp=(ms:number)=>new Date(ms).toISOString();
 const uuid=()=>crypto.randomUUID();
+// Stable pseudonymous identifier, not encryption; custom IDs are omitted from exports.
+function definitionId(id:string){let a=2166136261,b=5381;for(const c of id){a=Math.imul(a^c.charCodeAt(0),16777619);b=Math.imul(b,33)^c.charCodeAt(0);}return `task-${(a>>>0).toString(16)}${(b>>>0).toString(16)}`;}
 function metadata(task:STEMTask,config:ResearchConfig,now:number):TaskRun {
  // Random run ID rather than potentially identifying custom task IDs/titles.
- return {taskId:uuid(),catalogTaskId:demoTasks.find(t=>t.id===task.id&&t.title===task.title&&t.description===task.description)?.id,type:task.type,startedAt:stamp(now),completedStages:[],...(config.storeMessageText?{title:task.title,description:task.description}:{})};
+ const runId=uuid();return {taskId:runId,taskRunId:runId,definitionId:definitionId(task.id),catalogTaskId:demoTasks.find(t=>t.id===task.id&&t.title===task.title&&t.description===task.description)?.id,type:task.type,startedAt:stamp(now),completedStages:[],...(config.storeMessageText?{title:task.title,description:task.description}:{})};
 }
 export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData={},now=Date.now(),stage=s.currentStage,level=s.supportLevel):ResearchSession {
  const {messageText,...meta}=data;

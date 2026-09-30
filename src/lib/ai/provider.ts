@@ -4,4 +4,4 @@ export type FailureCode='not_configured'|'configuration'|'authentication'|'balan
 export class ProviderError extends Error {
  constructor(public code:FailureCode,public status=502){super(code);this.name='ProviderError';}
 }
-export const release={STEMPathVersion:'0.5.2',promptVersion:'deepseek-v1'} as const;
+export const release={STEMPathVersion:'0.5.3',promptVersion:'deepseek-v1'} as const;

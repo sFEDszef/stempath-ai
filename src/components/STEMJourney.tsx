@@ -1,3 +1,4 @@
+import {useI18n} from '@/lib/i18n';
 import { Check } from "lucide-react";
 
 import type { Stage, StageId } from "@/types";
@@ -12,12 +13,14 @@ export function STEMJourney({
   completed: StageId[];
   onStage: (id: StageId) => void;
 }) {
+ const {t}=useI18n();
+
   return (
     <section className="rail-section journey">
-      <h2>Your STEM Journey</h2>
+      <h2>{t("Your STEM Journey")}</h2>
       <div className="journey-summary">
-        <span>{completed.length} of 7 stages completed</span>
-        <strong>{Math.round((completed.length / 7) * 100)}%</strong>
+        <span>{completed.length}{t("of 7 stages completed")}</span>
+        <strong>{Math.round((completed.length / 7) * 100)}{t("%")}</strong>
       </div>
       <div className="progress-track">
         <span style={{ width: `${(completed.length / 7) * 100}%` }} />
@@ -42,7 +45,7 @@ export function STEMJourney({
               {stage.title}
               {stage.id === active && (
                 <small>
-                  {completed.includes(stage.id) ? "Completed" : "In progress"}
+                  {completed.includes(stage.id) ? t("Completed") : t("In progress")}
                 </small>
               )}
             </button>

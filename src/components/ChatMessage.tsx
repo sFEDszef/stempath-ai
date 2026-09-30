@@ -1,3 +1,4 @@
+import {useI18n} from '@/lib/i18n';
 import { Sparkles, UserRound } from "lucide-react";
 import type { Message } from "@/types";
 export function SuggestedReplies({
@@ -9,6 +10,8 @@ export function SuggestedReplies({
   onReply: (text: string) => void;
   disabled: boolean;
 }) {
+
+
   return (
     <div className="suggested-replies">
       {replies.map((reply) => (
@@ -20,14 +23,18 @@ export function SuggestedReplies({
   );
 }
 export function ChatMessage({
+  researchVisible=false,
   message,
   onReply,
   disabled,
 }: {
+  researchVisible?:boolean;
   message: Message;
   onReply: (text: string) => void;
   disabled: boolean;
 }) {
+ const {t}=useI18n();
+
   const ai = message.role === "assistant";
   return (
     <article className={`message ${ai ? "ai" : "student"}`}>
@@ -35,7 +42,7 @@ export function ChatMessage({
         {ai ? <Sparkles size={15} /> : <UserRound size={15} />}
       </div>
       <div className="message-body">
-        <span className="message-author">{ai ? `STEM Coach${message.metadata ? ` · ${message.metadata.provider==='deepseek'?'DeepSeek':'Demo'}${message.metadata.fallbackReason?' (fallback)':''}` : ''}` : "You"}</span>
+        <span className="message-author">{ai ? `${t("STEM Coach")}${researchVisible&&message.metadata ? ` · ${message.metadata.provider==='deepseek'?'DeepSeek':'Demo'}${message.metadata.fallbackReason?' (fallback)':''}` : ''}` : t("You")}</span>
         <div
           className="message-bubble"
           lang={/[\u3400-\u9fff]/.test(message.text) ? "zh-CN" : "en"}

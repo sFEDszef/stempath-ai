@@ -20,11 +20,22 @@ export function loadTask(input:unknown):STEMTask {
   const title=text(v.title,160,true)!; const description=text(v.description,4000,true)!;
   if(v.type!==undefined&&!taskTypes.includes(v.type as TaskType))throw new Error('Unknown task type.');
   const task:STEMTask={id:text(v.id,100)??`task-${hash(title+'\n'+description)}`,title,description,type:(v.type as TaskType)??classifyTask(title+' '+description)};
-  for(const key of ['context','additionalInstructions'] as const){const value=text(v[key],2000);if(value)task[key]=value;}
-  for(const key of ['objectives','constraints','successCriteria','availableMaterials','relevantDomains'] as const){
+  for(const key of ['context','additionalInstructions','subject','gradeLevel','lessonNumber','teacherNotes','safetyNotes'] as const){const value=text(v[key],2000);if(value)task[key]=value;}
+  for(const key of ['objectives','constraints','successCriteria','availableMaterials','relevantDomains','tags'] as const){
     if(v[key]===undefined)continue;
     if(!Array.isArray(v[key])||v[key].length>12)throw new Error('Use up to 12 entries per list.');
     task[key]=v[key].map(item=>text(item,300,true)!);
+  }
+  if(v.estimatedMinutes!==undefined){if(!Number.isInteger(v.estimatedMinutes)||(v.estimatedMinutes as number)<1||(v.estimatedMinutes as number)>10000)throw Error('Invalid duration');task.estimatedMinutes=v.estimatedMinutes as number;}
+  if(v.translations!==undefined){
+    if(!v.translations||typeof v.translations!=='object'||Array.isArray(v.translations))throw Error('Invalid translations');
+    task.translations={};
+    for(const [locale,content] of Object.entries(v.translations)){
+      if(!['zh-CN','en'].includes(locale)||!content||typeof content!=='object'||Array.isArray(content))throw Error('Invalid translation');
+      const c=content as Record<string,unknown>;const normalized=loadTask({...c,id:task.id,title:c.title??title,description:c.description??description,type:task.type,translations:undefined});
+      const translated:Record<string,unknown>={};for(const key of ['title','description','context','objectives','constraints','successCriteria','availableMaterials','relevantDomains','subject','gradeLevel','safetyNotes'] as const)if(c[key]!==undefined)translated[key]=normalized[key];
+      task.translations[locale as 'zh-CN'|'en']=translated;
+    }
   }
   return task;
 }
@@ -38,3 +49,5 @@ export function injectTask(input:unknown):void {
   window.dispatchEvent(new CustomEvent(TASK_LOAD_EVENT,{detail:task}));
 }
 export function taskStorageKey(task:STEMTask){return `${task.id}-${hash(JSON.stringify(task))}`;}
+
+export function localizedTask(task:STEMTask,locale:"zh-CN"|"en"):STEMTask{return {...task,...task.translations?.[locale],id:task.id};}

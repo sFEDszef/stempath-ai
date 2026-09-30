@@ -1,3 +1,4 @@
+import {useI18n} from '@/lib/i18n';
 import {
   Check,
   Sparkles,
@@ -21,10 +22,11 @@ export function ProgressSidebar({
   onStage: (id: StageId) => void;
   onTool: (name: string) => void;
 }) {
+ const {t}=useI18n();
+
   return (
     <aside className="progress-sidebar">
-      <div className="sidebar-heading">
-        PROJECT PROGRESS<span>{completed.length}/7</span>
+      <div className="sidebar-heading">{t("PROJECT PROGRESS")}<span>{completed.length}{t("/7")}</span>
       </div>
       <ol className="stage-list">
         {stages.map((stage, i) => (
@@ -56,21 +58,18 @@ export function ProgressSidebar({
           { name: "Help", icon: CircleHelp },
         ].map(({ name, icon: Icon }) => (
           <button
-            key={name}
+            key={t(name)}
             onClick={() => onTool(name)}
             className={name === "AI Coach" ? "tool-active" : ""}
           >
             <Icon size={18} />
-            {name}
+            {t(name)}
           </button>
         ))}
       </div>
       <div className="sidebar-note">
         <SproutMark />
-        <p>
-          Big ideas start with
-          <br />a little curiosity.
-        </p>
+        <p>{t("Big ideas start with")}<br />{t("a little curiosity.")}</p>
       </div>
     </aside>
   );
