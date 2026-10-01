@@ -1,4 +1,15 @@
 export const zh:Record<string,string>={
+"STEMPath AI logo":"STEMPath AI 标志",
+"Independently created and maintained by Tequila Sunset":"独立创建与维护：龙舌兰日落（Tequila Sunset）",
+"Contact:":"联系邮箱：",
+"Original Work & Maintenance Statement":"原创与维护声明",
+"STEMPath AI is independently initiated, designed, established, and continuously maintained by Tequila Sunset.":"STEMPath AI 由龙舌兰日落（Tequila Sunset）个人独立发起、设计、建立并持续维护。",
+"The platform architecture, educational interaction design, research-feature integration, and overall product design of STEMPath AI are independently developed and maintained by Tequila Sunset.":"网站的平台架构、教育交互设计、研究功能整合与整体产品设计由 Tequila Sunset 独立完成并持续维护。",
+"AI tools, AI models, open-source software, frameworks, fonts, icon libraries, hosting platforms, and other third-party services used during development serve only as development or technical support tools. The relevant rights to those third-party technologies remain with their respective rights holders.":"在开发过程中使用的人工智能工具、人工智能模型、开源软件、程序框架、字体、图标库、托管平台及其他第三方服务仅作为开发或技术支持工具使用，其相关权利归各自权利人所有。",
+"Unless explicitly stated otherwise, STEMPath AI currently has no other co-creators or co-maintainers.":"除另有明确说明外，目前 STEMPath AI 不设其他共同创建者或共同维护者。",
+"About STEMPath AI":"关于 STEMPath AI",
+"STEMPath AI is a bilingual learning and research platform for STEM inquiry and human–AI collaboration. It combines staged STEM inquiry, adaptive AI scaffolding, evidence-based reasoning, critical evaluation of AI, and reflection while preserving learner agency.":"STEMPath AI 是一个面向 STEM 探究学习与人机协作研究的双语学习与研究平台。平台结合分阶段 STEM 探究、自适应 AI 支持、证据推理、AI 质疑与反思活动，旨在帮助学习者在使用人工智能支持的同时保持主动思考与决策。",
+
   "Home": "首页",
   "Challenges": "STEM任务",
   "My Projects": "我的项目",
