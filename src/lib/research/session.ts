@@ -92,6 +92,8 @@ export function setTextStorage(s:ResearchSession,enabled:boolean):ResearchSessio
  return recordEvent({...next,events:s.events.map(({messageText: _text,...event})=>{void _text;return event}),artifactRevisions:s.artifactRevisions.map(({text:_text,...revision})=>{void _text;return revision}),tasks:s.tasks.map(({title:_title,description:_description,...task})=>{void _title;void _description;return task})},'CONFIG_CHANGED',{systemAction:'TEXT_STORAGE_OFF',settings:next.config});
 }
 export function snapshot(s:ResearchSession,now=Date.now()):ResearchSession {
+ // Saved-session export must include heartbeat time after the last structured event.
+ now=Math.max(now,s.activity.lastTick,Date.parse(s.updatedAt));
  return {...s,...durations(s,now),stageTimings:s.stageTimings.map(t=>t.stageExitedAt?t:{...t,durationMs:Math.max(0,now-Date.parse(t.stageEnteredAt))})};
 }
 export function sessionSummary(s:ResearchSession){return {stages:s.completedStages.length,revisions:s.artifactRevisions.filter(r=>r.taskId===s.taskId&&r.version>1).length,evidence:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='MESSAGE_SENT'&&e.learnerSignal?.includes('evidence')).length,challenges:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='AI_CHALLENGE_RESPONSE').length,supportChanges:s.supportHistory.filter(h=>h.taskId===s.taskId&&h.from!==undefined).length};}

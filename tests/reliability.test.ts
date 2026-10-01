@@ -47,3 +47,5 @@ describe('reusable bilingual policy cases',()=>{
 describe('NO_AI full journey',()=>{
  it('completes seven stages with no usage/provider errors',()=>{let s=startSession(demoTasks[0],conditionConfig('NO_AI'),1000,{provider:'none',model:'none',interfaceLanguage:'zh-CN',taskLanguage:'zh-CN'});for(const stage of stageIds)s=completeStage(s,stage,true,1500);s=finishSession(s,2000);expect(validateSession(s).status).toBe('PASS');expect(s.usage).toEqual({aiCalls:0,inputTokens:0,outputTokens:0,totalTokens:0});expect(s.events.some(e=>e.eventType==='AI_ERROR')).toBe(false);});
 });
+
+it("saved-session export includes heartbeat time after the last event",()=>{const s=fresh();s.activity=tick(s.activity,61000,120000);const out=JSON.parse(exportJSON(s,Date.parse(s.updatedAt)));expect(out.elapsedDurationMs).toBe(60000);expect(out.activeDurationMs).toBe(60000);});
