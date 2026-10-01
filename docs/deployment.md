@@ -26,3 +26,36 @@ GitHub Pages cannot host this full application because it does not execute the s
 ## Future Vercel work (not configured yet)
 
 Import the GitHub repository as a Next.js project, select a supported Node runtime matching CI, and use the existing build/start architecture without a Pages base path or static output directory. Verify `/api/chat` and demo behavior in a preview deployment. Add server-only `DEEPSEEK_API_KEY` only when real AI is wanted; no key is required for the demo or validation. Configure a custom domain and DNS later. Authentication, database and billing require their own implementation and environment setup when introduced.
+
+
+## Custom domain
+
+Official public URL: https://stempathai.com
+Research entry: https://stempathai.com/?research=1
+
+The existing `sfedszef/stempath-ai` Vercel project remains the host; GitHub main remains the deployment source. `www.stempathai.com` is configured in Vercel as a 308 permanent redirect to `stempathai.com`. DNS must validate before either custom hostname is usable. Keep https://stempath-ai.vercel.app available as a technical backup and for exporting old browser data; do not redirect preview deployment hosts.
+
+Vercel DNS instructions observed on 2026-10-01:
+
+| Type | Alibaba Cloud host | Target |
+| --- | --- | --- |
+| A | @ | 216.198.79.1 |
+| CNAME | www | c1a4934dc2a10856.vercel-dns-017.com. |
+
+Vercel did not specify a TTL or request TXT verification at this point. Use the DNS provider's default TTL (600 seconds is suitable if offered). Recheck the project Domains screen before future changes; these are observed project values, not universal Vercel defaults. Do not repeatedly change correct records while propagation is pending. Vercel provisions HTTPS after validation; no additional certificate purchase is needed.
+
+### Configuration audit
+
+- No hardcoded old production hostname existed in application routing. `/api/chat`, `/api/task-check` and `/api/coach-status` remain relative, same-origin requests.
+- API origin checks compare the Origin host with the incoming Host (or request URL fallback), so custom domains, localhost and preview hosts work without an arbitrary-origin allowlist or wildcard CORS.
+- `metadataBase`, canonical and Open Graph URL now use the official root domain. Existing creator, logo and favicon remain unchanged. All current application views share `/`; no invented page URLs are added.
+- No robots/sitemap or structured-data routes existed; none were added solely for this migration.
+- Historical Pages documentation is retained. No provider environment variables or credentials are changed.
+
+### Browser-local data does not move between domains
+
+The custom domain and old Vercel hostname are different browser origins. Projects, task library, language preference, research sessions and local settings do not transfer automatically. Keep the old address available while users back up data. Export the Task Library and v0.6 research-session bundle using their existing controls, then import them on the new domain. Do not claim that these exports transfer learner projects, notebooks or chat history: there is no full-project migration feature in this release. Retain the original browser/origin for that work. Do not clear old browser data until backups have been verified. No unsafe cross-origin storage access is attempted, and research schema remains 0.6.
+
+### Mainland China access
+
+The custom domain removes the public dependence on the `vercel.app` hostname and may improve accessibility, but it does not guarantee reliable access from mainland China. Hosting is still on Vercel; performance varies with region, ISP and international routing. A future China-region deployment may be needed for formal mainland student research, with ICP filing requirements assessed for the chosen infrastructure/location. This task does not migrate hosting.

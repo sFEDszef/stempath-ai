@@ -1,3 +1,9 @@
+# Official website
+
+[STEMPath AI](https://stempathai.com) · [Research mode](https://stempathai.com/?research=1)
+
+Hosted on the existing Vercel project. See [custom-domain deployment and browser-data migration](docs/deployment.md#custom-domain).
+
 # STEMPath AI v0.6
 
 Research Reliability & Pilot Readiness. See [v0.6 research protocol and limitations](docs-v06.md) for schema, timing, exports, safeguards and supervised-pilot requirements.
