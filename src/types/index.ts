@@ -48,6 +48,7 @@ export interface Artifact {
 
 export type TaskType = "engineering-design" | "scientific-inquiry" | "experimental-investigation" | "optimization" | "modelling" | "general-stem";
 export interface STEMTask {
+  taskRevision?: number;
   id: string;
   title: string;
   description: string;
@@ -84,7 +85,8 @@ export interface StagePedagogy {
 
 export interface CoachMetadata {
  provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
- STEMPathVersion:'0.5.3';promptVersion:'deepseek-v1';
+ STEMPathVersion:'0.6';promptVersion:'deepseek-v2';
+ providerAttempted?:boolean;diagnostic?:string;compliance?:'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_FALLBACK_DEMO';
  tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
  fallbackReason?:string;
 }

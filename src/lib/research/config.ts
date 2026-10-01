@@ -2,12 +2,13 @@ import type { SupportLevel } from '@/types';
 export const conditions = ['LOW_SUPPORT','ADAPTIVE_SUPPORT','HIGH_SUPPORT','NO_AI','CUSTOM'] as const;
 export type Condition = typeof conditions[number];
 export interface ResearchConfig {
+ maxAICallsPerSession:number;maxTokensPerSession:number;idleThresholdMs:number;
  condition: Condition; storeMessageText: boolean; enableAIChallenge: boolean;
  enableFading: boolean; enableEscalation: boolean; allowManualSupportChange: boolean;
  randomTaskMode: boolean; seed: string;
 }
 export function conditionConfig(condition: Condition = 'ADAPTIVE_SUPPORT'): ResearchConfig {
- return {condition,storeMessageText:false,enableAIChallenge:condition!=='NO_AI',enableFading:condition==='ADAPTIVE_SUPPORT',enableEscalation:condition==='ADAPTIVE_SUPPORT',allowManualSupportChange:condition!=='NO_AI',randomTaskMode:false,seed:''};
+ return {maxAICallsPerSession:40,maxTokensPerSession:30000,idleThresholdMs:120000,condition,storeMessageText:false,enableAIChallenge:condition!=='NO_AI',enableFading:condition==='ADAPTIVE_SUPPORT',enableEscalation:condition==='ADAPTIVE_SUPPORT',allowManualSupportChange:condition!=='NO_AI',randomTaskMode:false,seed:''};
 }
 export function parseResearchConfig(input: unknown): ResearchConfig {
  if(input===undefined)return conditionConfig();
@@ -19,6 +20,7 @@ export function parseResearchConfig(input: unknown): ResearchConfig {
   if(v[key]!==undefined){if(typeof v[key]!=='boolean')throw new Error('Invalid setting');result[key]=v[key];}
  }
  if(v.seed!==undefined){if(typeof v.seed!=='string'||v.seed.length>80)throw new Error('Invalid seed');result.seed=v.seed;}
+ for(const key of ["maxAICallsPerSession","maxTokensPerSession","idleThresholdMs"] as const){if(v[key]!==undefined){if(!Number.isSafeInteger(v[key])||(v[key] as number)<1||(v[key] as number)>10000000)throw Error("Invalid limit");result[key]=v[key] as number;}}
  return result;
 }
 export const initialLevel=(condition:Condition):SupportLevel=>condition==='HIGH_SUPPORT'?3:1;

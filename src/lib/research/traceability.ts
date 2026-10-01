@@ -1,0 +1,8 @@
+import type {STEMTask} from '@/types';
+import {loadTask} from '@/lib/stem/tasks';
+/** Canonical non-cryptographic fingerprint for change detection, not tamper proofing. */
+export function canonical(value:unknown):string {if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';if(value&&typeof value==='object')return '{'+Object.entries(value).filter(([,v])=>v!==undefined).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>JSON.stringify(k)+':'+canonical(v)).join(',')+'}';return JSON.stringify(value)??'null';}
+export function fingerprint(value:unknown){let a=2166136261,b=5381;for(const c of canonical(value)){a=Math.imul(a^c.charCodeAt(0),16777619);b=Math.imul(b,33)^c.charCodeAt(0);}return `fnv-${(a>>>0).toString(16)}-${(b>>>0).toString(16)}`;}
+export function reviseTask(input:STEMTask,previous?:STEMTask):STEMTask {const next=loadTask(input);if(!previous)return next;const same=canonical({...next,taskRevision:undefined})===canonical({...loadTask(previous),taskRevision:undefined});return {...next,taskRevision:(previous.taskRevision??1)+(same?0:1)};}
+export const participantPattern=/^[A-Za-z][A-Za-z0-9-]{1,31}$/;
+export function measures(input:unknown):Record<string,number>{if(!input||typeof input!=='object'||Array.isArray(input)||Object.keys(input).length>30)throw Error('Use up to 30 numeric measures.');const result:Record<string,number>={};for(const [k,v] of Object.entries(input)){if(!/^[A-Za-z][A-Za-z0-9_]{0,39}$/.test(k)||['constructor','prototype','__proto__'].includes(k)||typeof v!=='number'||!Number.isFinite(v))throw Error('Measure names must be simple variable names and values finite numbers.');result[k]=v;}return result;}

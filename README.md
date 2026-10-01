@@ -1,3 +1,7 @@
+# STEMPath AI v0.6
+
+Research Reliability & Pilot Readiness. See [v0.6 research protocol and limitations](docs-v06.md) for schema, timing, exports, safeguards and supervised-pilot requirements.
+
 # STEMPath AI v0.5.2 — DeepSeek Pilot
 
 **Think · Explore · Build · Grow**

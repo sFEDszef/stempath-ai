@@ -37,6 +37,8 @@ export function loadTask(input:unknown):STEMTask {
       task.translations[locale as 'zh-CN'|'en']=translated;
     }
   }
+  if(v.taskRevision!==undefined&&(!Number.isSafeInteger(v.taskRevision)||(v.taskRevision as number)<1))throw Error("Invalid task revision");
+  task.taskRevision=(v.taskRevision as number)??1;
   return task;
 }
 function hash(text:string){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}

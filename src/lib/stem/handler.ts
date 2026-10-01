@@ -2,7 +2,7 @@ import { aiEnabled, conditionConfig } from '@/lib/research/config';
 import 'server-only';
 import { respond } from '@/lib/ai';
 import { demoProvider } from '@/lib/ai/demoProvider';
-import { ProviderError } from '@/lib/ai/provider';
+import { ProviderError,diagnostics,release } from '@/lib/ai/provider';
 import { decidePedagogicalAction } from '@/lib/pedagogy/decisionEngine';
 import { suggestedReplies } from '@/lib/pedagogy/responses';
 import { MAX_BODY_BYTES, parseChatRequest } from './validation';
@@ -38,6 +38,6 @@ export async function handleChat(req: Request, generate?: GenerateReply): Promis
     return reply(await respond(request));
   } catch(error) {
     const code=error instanceof ProviderError?error.code:'upstream';
-    return reply({error:'DeepSeek could not respond. Please retry or select Demo. / DeepSeek 暂时无法回复，请重试或选择 Demo。',code,retryable:true},error instanceof ProviderError?error.status:502);
+    return reply({error:'DeepSeek could not respond. Please retry or select Demo. / DeepSeek 暂时无法回复，请重试或选择 Demo。',code,diagnostic:diagnostics[code],metadata:error instanceof ProviderError?(error.metadata??{...release,provider:"deepseek",model:"unavailable",responseMode:"ai",providerAttempted:false,diagnostic:diagnostics[code]}):undefined,retryable:true},error instanceof ProviderError?error.status:502);
   }
 }

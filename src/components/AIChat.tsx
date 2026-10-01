@@ -117,7 +117,7 @@ export function AIChat({
             <Sparkles size={15} />{t("Your coach is thinking")}<span>{t("•••")}</span>
           </div>
         )}
-        {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{researchVisible?error.message:t("The coach could not respond. Please retry.")}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>{t("Retry / 重试")}</button></div>}</div></div>}
+        {!coachDisabled&&error && <div className="message ai" role="alert"><div className="message-body"><div className="message-bubble">{researchVisible||error.message.includes('使用上限')?error.message:t("The coach could not respond. Please retry.")}</div>{error.retryable && <div className="suggested-replies"><button disabled={busy} onClick={onRetry}>{t("Retry / 重试")}</button></div>}</div></div>}
       </div>
       {!coachDisabled&&recommendation}
       {!coachDisabled&&<div className="composer-area">

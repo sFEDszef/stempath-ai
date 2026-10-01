@@ -13,5 +13,5 @@ export function parseProject(value:unknown):Project {
 }
 export function readCollection<T>(raw:string|null,parse:(v:unknown)=>T):T[]{if(!raw)return [];try{const value=JSON.parse(raw);if(!Array.isArray(value)||value.length>200)return [];return value.flatMap(item=>{try{return [parse(item)];}catch{return [];}});}catch{return [];}}
 export function importTasks(raw:string):STEMTask[]{const data=JSON.parse(raw);const items=Array.isArray(data)?data:[data];if(!items.length||items.length>100)throw Error('Invalid import');return items.map(loadTask);}
-export function duplicateTask(task:STEMTask,suffix:string):STEMTask{return loadTask({...task,id:crypto.randomUUID(),title:task.title.slice(0,140)+suffix,translations:undefined});}
+export function duplicateTask(task:STEMTask,suffix:string):STEMTask{return loadTask({...task,id:crypto.randomUUID(),taskRevision:1,title:task.title.slice(0,140)+suffix,translations:undefined});}
 export function exportTasks(tasks:STEMTask[]){return JSON.stringify(tasks.map(loadTask),null,2);}

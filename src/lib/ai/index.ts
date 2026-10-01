@@ -14,6 +14,6 @@ export async function respond(request:ChatRequest):Promise<CoachResponse> {
  }catch(error){
   const safe=error instanceof ProviderError?error:new ProviderError('upstream');
   if(request.mode==='deepseek')throw safe;
-  return demoProvider(request,safe.code);
+  const result=demoProvider(request,safe.code);return {...result,metadata:{...result.metadata!,providerAttempted:!!safe.metadata?.providerAttempted,tokenUsage:safe.metadata?.tokenUsage,diagnostic:safe.metadata?.diagnostic,compliance:safe.code==='pedagogy'?'COMPLIANCE_FALLBACK_DEMO':undefined}};
  }
 }

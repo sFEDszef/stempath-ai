@@ -29,7 +29,7 @@ import { suggestedReplies } from "@/lib/pedagogy/responses";
 import { SupportRecommendation } from "./SupportRecommendation";
 import { LearningArtifacts } from "./LearningArtifacts";
 import { AIChallenge } from "./AIChallenge";
-import { apiCoach, CoachError } from "@/lib/coach";
+import { CoachError } from "@/lib/coach";
 import type { Artifact, Message, StageId, SupportLevel, ChatRequest, STEMTask, LearningArtifacts as Thinking } from "@/types";
 export default function Workspace({task,initialProject,onProgress,onNavigate,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{initialProject:Project;onProgress:(p:Pick<Project,"active"|"completed"|"level"|"records">)=>void;onNavigate:(name:string)=>void;task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
   const {t,locale}=useI18n();
@@ -77,7 +77,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
     if(recommendationKey&&suggestionRef.current!==recommendationKey){const fade=adaptive.decision.reason==='fade';researchEvent(fade?'FADING_SUGGESTED':'ESCALATION_SUGGESTED',{supportRecommendation:adaptive.decision.recommendation,fadingSuggested:fade,escalationSuggested:!fade});}
     suggestionRef.current=recommendationKey;
   },[recommendationKey,adaptive.decision.reason,adaptive.decision.recommendation,researchEvent]);
-  function changeLevel(next:SupportLevel){if(!manualSupport||next===level||pendingRef.current.has(active))return;research.support(next,'STUDENT');setLevel(next);void deliver({...adaptiveRequest,level:next,previousLevel:level,intent:'support-change',message:locale==='zh-CN'?'请调整帮助。':'Please adjust the guidance.'});}
+  function changeLevel(next:SupportLevel){if(!manualSupport||next===level||(pendingRef.current.size>0||research.busy))return;research.support(next,'STUDENT');setLevel(next);void deliver({...adaptiveRequest,level:next,previousLevel:level,intent:'support-change',message:locale==='zh-CN'?'请调整帮助。':'Please adjust the guidance.'});}
   function recordArtifact(field:string,value:string){const key=`${active}:${field}`;if(lastArtifacts.current[key]===value||(!value&&!lastArtifacts.current[key]))return;lastArtifacts.current[key]=value;research.artifact(active,field,value);}
 
   function completeStage(force=false){
@@ -88,7 +88,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
     setCompleted(prev=>[...prev,active]);setCompletionWarning([]);research.complete(active,true);
   }
   function chooseSupport(accept:boolean){
-    if(!adaptive.showRecommendation||pendingRef.current.has(active)||finished)return;
+    if(!adaptive.showRecommendation||(pendingRef.current.size>0||research.busy)||finished)return;
     const fade=adaptive.decision.reason==='fade';
     research.event(fade?(accept?'FADING_ACCEPTED':'FADING_REJECTED'):(accept?'ESCALATION_ACCEPTED':'ESCALATION_REJECTED'),{supportRecommendation:adaptive.decision.recommendation,fadingAccepted:fade?accept:undefined,escalationAccepted:!fade?accept:undefined});
     const next=adaptive.resolveRecommendation(accept);
@@ -139,19 +139,19 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   async function deliver(request: ChatRequest) {
     if(!coachEnabled||finished)return;
     const requestStage = request.stage;
-    if (pendingRef.current.has(requestStage)) return;
+    if ((pendingRef.current.size>0||research.busy)) return;
     pendingRef.current.add(requestStage);
     setPending(prev => [...prev, requestStage]);
     setChatErrors(prev => ({...prev, [requestStage]:undefined}));
     try {
-      const response = await apiCoach.respond(request);
+      const response = await research.generate(request);
       if(!alive.current)return;
-      research.event('AI_RESPONSE',{messageText:response.text,systemAction:response.mode.toUpperCase(),coach:response.metadata},requestStage,request.level);
+
       setResponseMode(response.mode);
       setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response}]}));
     } catch (error) {
       if(!alive.current)return;
-      research.event('AI_ERROR',{systemAction:'GENERATION_FAILED'},requestStage);
+
       setChatErrors(prev => ({...prev,[requestStage]:{message:error instanceof Error?error.message:'The coach could not respond.',retryable:!(error instanceof CoachError)||error.retryable,request}}));
     } finally {
       pendingRef.current.delete(requestStage);
@@ -159,7 +159,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
     }
   }
   async function send(text: string, claim?:string) {
-    if (!text.trim() || pendingRef.current.has(active)||!coachEnabled||finished) return;
+    if (!text.trim() || (pendingRef.current.size>0||research.busy)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
     const request:ChatRequest = {interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
     adaptive.onStudentTurn();
@@ -217,18 +217,18 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
             <span>{task.title}</span><button onClick={onLoadTask}>{t("Load STEM Challenge")}</button>
           </div>
           <ChallengeCard task={task} />
-          {coachEnabled&&researchVisible&&<div className="coach-mode"><label>{t("Coach mode")}<select aria-label={t("Coach mode")} value={mode} onChange={e=>{setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">{t("Auto · AI when available")}</option><option value="deepseek">{t("DeepSeek · real AI only")}</option><option value="demo">{t("Demo · local practice")}</option></select></label><span>{responseMode==='demo'?t("Demo response · local guidance"):responseMode==='ai'?t("DeepSeek · real AI response"):mode==='deepseek'?t("DeepSeek only · errors allow retry."):t("Practice with Demo when AI is unavailable.")}</span></div>}
+          {coachEnabled&&researchVisible&&<div className="coach-mode"><label>{t("Coach mode")}<select aria-label={t("Coach mode")} value={mode} onChange={e=>{research.event('CONFIG_CHANGED',{systemAction:'MODE_'+e.target.value.toUpperCase()});setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">{t("Auto · AI when available")}</option><option value="deepseek">{t("DeepSeek · real AI only")}</option><option value="demo">{t("Demo · local practice")}</option></select></label><span>{responseMode==='demo'?t("Demo response · local guidance"):responseMode==='ai'?t("DeepSeek · real AI response"):mode==='deepseek'?t("DeepSeek only · errors allow retry."):t("Practice with Demo when AI is unavailable.")}</span></div>}
           <AIChat
             researchVisible={researchVisible}
-            recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={{...adaptive.decision,state:{...adaptive.decision.state,language:locale==='zh-CN'?'zh':'en'}}} onChoice={chooseSupport} disabled={pending.includes(active)}/>:undefined}
+            recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={{...adaptive.decision,state:{...adaptive.decision.state,language:locale==='zh-CN'?'zh':'en'}}} onChoice={chooseSupport} disabled={(pending.length>0||research.busy)}/>:undefined}
             coachDisabled={!coachEnabled||finished}
-            supportDisabled={!manualSupport||pending.includes(active)}
+            supportDisabled={!manualSupport||(pending.length>0||research.busy)}
             sessionFinished={finished}
             mode={responseMode??(mode==="auto"?undefined:mode)}
             stage={stage}
             level={level}
             messages={messages.map(m=>m.suggestions?{...m,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}:m)}
-            busy={pending.includes(active)}
+            busy={(pending.length>0||research.busy)}
             onSend={text=>void send(text)}
             error={chatErrors[active]}
             onRetry={retry}
@@ -270,9 +270,9 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
             onRemove={removeArtifact}
           />
           </details>
-          {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport||pending.includes(active)}/>}
+          {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport||(pending.length>0||research.busy)}/>}
           {coachEnabled&&<p className="support-status" aria-live="polite">{locale==='zh-CN'?t("AI 支持"):t("AI support")}{t(":")}{adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(locale==='zh-CN'?'可以尝试更具体的提示':'A stronger hint is available'):(locale==='zh-CN'?'可以尝试更独立地思考':'Ready to try more independently')):(locale==='zh-CN'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
-          {!finished&&adaptive.decision.challengeEligible&&<AIChallenge language={locale==='zh-CN'?'zh':'en'} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={pending.includes(active)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
+          {!finished&&adaptive.decision.challengeEligible&&<AIChallenge generateResponse={research.generate} language={locale==='zh-CN'?'zh':'en'} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={(pending.length>0||research.busy)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
 
         </aside>
       </div>

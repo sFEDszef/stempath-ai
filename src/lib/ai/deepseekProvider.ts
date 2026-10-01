@@ -3,7 +3,7 @@ import type { ChatRequest, CoachResponse, CoachMetadata } from '@/types';
 import { buildInstructions } from '@/lib/stem/prompts';
 import { providerStrategy } from '@/lib/pedagogy/decisionEngine';
 import { suggestedReplies } from '@/lib/pedagogy/responses';
-import { ProviderError, release } from './provider';
+import { ProviderError, release, diagnostics } from './provider';
 export function buildDeepSeekMessages(request:ChatRequest) {
  const strategy=providerStrategy(request);
  const {id:_id,teacherNotes:_notes,translations:_translations,...task}=request.task;void _id;void _notes;void _translations;
@@ -14,14 +14,15 @@ export function buildDeepSeekMessages(request:ChatRequest) {
 }
 /** A conservative format check, not a semantic safety guarantee. Never repair with another paid call. */
 export function pedagogicallyValid(text:string,request:ChatRequest) {
+ if(/(?:touch|connect).*?(?:mains|live wire)|mix.*bleach.*ammonia|触摸带电|混合漂白/i.test(text))return false;
  if(text.length>1800||/```|(?:^|\n)\s*(?:step\s*\d|步骤\s*\d)/i.test(text))return false;
  if(request.intent==='challenge')return text.length<=500&&!/[?？]/.test(text);
  const questions=(text.match(/[?？]/g)??[]).length;
  if(request.level===1){
   if(questions!==1||!/[?？][”"']?$/.test(text)||text.length>(request.intent==='support-change'?320:240))return false;
-  if(/(?:^|\n)\s*(?:\d+[.)、]|[-*•])|例如|比如|举例|可以选择|填空|首先|接着|最后|for example|such as|first,|then,|you could|choose between|___/i.test(text))return false;
+  if(/(?:^|\n)\s*\d+[.)、]\s*(?:build|add|attach|cut|安装|制作|剪)|例如|比如|举例|可以选择|填空|首先|接着|最后|for example|such as|first,|then,|you could|choose between|___/i.test(text))return false;
   const body=request.intent==='support-change'?text.replace(/^[^?？\n]*[。.!！]\s*/,''):text;
-  if(/[。!！]|\.\s+[A-Z]/.test(body)||body.split(/\s+/).length>45||(/[\u3400-\u9fff]/.test(body)&&body.length>100))return false;
+  if(body.split(/\s+/).length>45||(/[\u3400-\u9fff]/.test(body)&&body.length>100))return false;
  }
  if(request.level===2&&(questions!==1||text.length>700))return false;
  if(request.intent==='evaluate-claim'&&/you are (?:right|correct)|that is (?:true|false)|你[说答]对了|你[说答]错了|这个观点是正确|这个观点是错误/i.test(text))return false;
@@ -40,6 +41,8 @@ export async function deepseekProvider(request:ChatRequest):Promise<CoachRespons
  const base=(process.env.DEEPSEEK_BASE_URL||'https://api.deepseek.com').replace(/\/$/,'');
  // Keep credentials on the official host; redirects must not carry authorization elsewhere.
  if(!['https://api.deepseek.com','https://api.deepseek.com/v1'].includes(base)||!/^deepseek-[a-z0-9.-]{1,60}$/.test(model))throw new ProviderError('configuration',503);
+ const metadata:CoachMetadata={...release,provider:'deepseek',model,responseMode:'ai',providerAttempted:true};
+ try {
  const signal=AbortSignal.timeout(24_000);
  let response:Response;
  try {
@@ -50,9 +53,11 @@ export async function deepseekProvider(request:ChatRequest):Promise<CoachRespons
  try {raw=await response.json();}catch{throw new ProviderError(signal.aborted?'timeout':'invalid_response');}
  if(!raw||typeof raw!=='object')throw new ProviderError('invalid_response');
  const data=raw as {choices?:{finish_reason?:string;message?:{content?:unknown}}[];model?:unknown;usage?:unknown};
+ metadata.tokenUsage=usage(data.usage);
  const choice=Array.isArray(data.choices)?data.choices[0]:undefined;
  const text=typeof choice?.message?.content==='string'?choice.message.content.trim():'';
  if(!text||text.length>1800||choice?.finish_reason!=='stop'||typeof data.model!=='string'||!/^deepseek-[a-z0-9.-]{1,80}$/.test(data.model)||text.includes(key))throw new ProviderError('invalid_response');
  if(!pedagogicallyValid(text,request))throw new ProviderError('pedagogy');
- return {text,suggestions:request.intent==='challenge'?[]:suggestedReplies(providerStrategy(request).language),mode:'ai',metadata:{...release,provider:'deepseek',model:data.model,responseMode:'ai',tokenUsage:usage(data.usage)}};
+ return {text,suggestions:request.intent==='challenge'?[]:suggestedReplies(providerStrategy(request).language),mode:'ai',metadata:{...metadata,model:data.model,compliance:'COMPLIANCE_CHECK_PASSED'}};
+ }catch(error){const safe=error instanceof ProviderError?error:new ProviderError('upstream');safe.metadata={...metadata,diagnostic:diagnostics[safe.code]};throw safe;}
 }

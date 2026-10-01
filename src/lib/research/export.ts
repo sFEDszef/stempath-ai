@@ -1,11 +1,14 @@
+import {validateSession,assertSession} from './integrity';
 import { snapshot, type ResearchSession } from './session';
-export function exportJSON(session:ResearchSession,now=Date.now()){return JSON.stringify({exportedAt:new Date(now).toISOString(),...snapshot(session,now)},null,2);}
+export function manifest(s:ResearchSession,now=Date.now()){const report=validateSession(s),task=s.tasks.find(t=>t.taskId===s.taskId)!;return {schemaVersion:s.schemaVersion,exportedAt:new Date(now).toISOString(),sessionId:s.sessionId,participantCode:s.participantCode,condition:s.condition,taskDefinitionId:task.taskDefinitionId,taskRevision:task.taskRevision,taskSnapshotHash:task.taskSnapshotHash,provider:s.provider,model:s.model,promptVersion:s.promptVersion,interfaceLanguage:s.interfaceLanguage,taskLanguage:s.taskLanguage,eventCount:s.events.length,warningCount:report.warnings.length,integrityStatus:report.status};}
+export function exportJSON(session:ResearchSession,now=Date.now()){const s=snapshot(session,now);assertSession(s);return JSON.stringify({...s,manifest:manifest(s,now),integrity:validateSession(s)},null,2);}
 function cell(value:unknown){let text=value===undefined?'':typeof value==='object'?JSON.stringify(value):String(value);if(/^[\s]*[=+\-@]/.test(text))text="'"+text;return '"'+text.replaceAll('"','""')+'"';}
 /** Long-form CSV: each row has a recordType; nested signals are JSON in a quoted cell. */
 export function exportCSV(session:ResearchSession,now=Date.now()) {
- const s=snapshot(session,now);
+ const s=snapshot(session,now);assertSession(s);
  const {events,tasks,stageTimings,supportHistory,artifactRevisions,...metadata}=s;
  const rows:Record<string,unknown>[]=[{recordType:'session',...metadata},...tasks.map(v=>({recordType:'task',sessionId:s.sessionId,...v})),...events.map(v=>({recordType:'event',...v})),...stageTimings.map(v=>({recordType:'stageTiming',sessionId:s.sessionId,...v})),...supportHistory.map(v=>({recordType:'support',sessionId:s.sessionId,...v})),...artifactRevisions.map(v=>({recordType:'artifact',sessionId:s.sessionId,...v}))];
+ for(const row of rows)Object.assign(row,{...manifest(s,now),...row});
  const columns=[...new Set(rows.flatMap(Object.keys))];
  return [columns.map(cell).join(','),...rows.map(row=>columns.map(key=>cell(row[key])).join(','))].join('\r\n');
 }
@@ -13,3 +16,8 @@ export function downloadSession(s:ResearchSession,format:'json'|'csv',now=Date.n
  const blob=new Blob([format==='json'?exportJSON(s,now):'\uFEFF'+exportCSV(s,now)],{type:format==='json'?'application/json':'text/csv;charset=utf-8'});
  const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`stempath-session-${s.sessionId}.${format}`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+export function exportBundle(sessions:ResearchSession[],now=Date.now()){if(!sessions.length)throw Error('No sessions to export.');return JSON.stringify({schemaVersion:'0.6',exportedAt:new Date(now).toISOString(),sessions:sessions.map(s=>JSON.parse(exportJSON(s,Date.parse(s.completedAt??s.endedAt??s.updatedAt))))},null,2);}
+/** One row per session; numeric measure names are namespaced to avoid collisions. */
+export function combinedCSV(sessions:ResearchSession[]){const rows=sessions.map(s=>{assertSession(s);return {...manifest(s),...Object.fromEntries(Object.entries(s.baselineMeasures).map(([k,v])=>['baseline.'+k,v])),...Object.fromEntries(Object.entries(s.outcomeMeasures).map(([k,v])=>['outcome.'+k,v]))};});const keys=[...new Set(rows.flatMap(Object.keys))];return [keys.map(cell).join(','),...rows.map(r=>keys.map(k=>cell((r as Record<string,unknown>)[k])).join(','))].join('\r\n');}
+/** Text remains blank unless captured with explicit opt-in; reviewers rate offline. */
+export function educatorReview(s:ResearchSession){assertSession(s);return s.events.filter(e=>e.eventType==='AI_RESPONSE').map(e=>{const input=s.events.slice(0,s.events.indexOf(e)).findLast(v=>v.eventType==='MESSAGE_SENT'&&v.stage===e.stage&&v.taskId===e.taskId);return {sessionId:s.sessionId,task:s.tasks.find(t=>t.taskId===e.taskId),stage:e.stage,condition:s.condition,supportLevel:e.supportLevel,studentInput:input?.messageText??null,aiResponse:e.messageText??null,provider:e.coach?.provider,model:e.coach?.model,pedagogicalAction:input?.pedagogicalDecision,textCaptured:!!e.messageText,ratings:{appropriateSupport:'Unsure',tooMuchHelp:'Unsure',tooLittleHelp:'Unsure',taskRelevance:'Unsure',languageQuality:'Unsure',safetyConcern:'Unsure'}};});}
