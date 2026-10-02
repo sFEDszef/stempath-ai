@@ -1,6 +1,6 @@
 {
   "name": "stempath-ai",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
@@ -8,7 +8,10 @@
     "start": "next start --hostname 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:bootstrap": "tsx scripts/bootstrap.ts"
   },
   "dependencies": {
     "lucide-react": "1.43.0",
@@ -16,7 +19,9 @@
     "openai": "^7.13.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "pg": "^8.16.3",
+    "drizzle-orm": "^0.44.5"
   },
   "devDependencies": {
     "@types/node": "22.20.1",
@@ -25,7 +30,11 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.4",
     "typescript": "6.0.3",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "@electric-sql/pglite": "^0.3.10",
+    "tsx": "^4.20.5"
   },
   "engines": {
     "node": ">=20.9.0"

@@ -12,7 +12,7 @@ export function validateSession(value:unknown):IntegrityReport {
  try {
   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('Invalid session object');
   const s=value as ResearchSession;
-  require(s.schemaVersion==='0.6'&&['0.6','0.6.2'].includes(s.stempathVersion),'Unsupported schema/app version');
+  require(s.schemaVersion==='0.6'&&['0.6','0.6.2','0.7'].includes(s.stempathVersion),'Unsupported schema/app version');
   require(typeof s.sessionId==='string'&&/^[a-f0-9-]{36}$/i.test(s.sessionId),'Invalid session ID');
   require(s.participantCode===undefined||(typeof s.participantCode==='string'&&participantPattern.test(s.participantCode)),'Invalid participant code');
   measures(s.baselineMeasures);measures(s.outcomeMeasures);parseResearchConfig(s.config);
@@ -38,7 +38,7 @@ export function validateSession(value:unknown):IntegrityReport {
   for(const e of s.events){require(e.sessionId===s.sessionId&&runs.has(e.taskId)&&!ids.has(e.eventId)&&typeof e.eventId==='string','Cross-session/task or duplicate event');ids.add(e.eventId);require(date(e.timestamp)&&Date.parse(e.timestamp)>=previous,'Events not ordered');previous=Date.parse(e.timestamp);require(e.condition===s.condition&&stageIds.includes(e.stage)&&[1,2,3].includes(e.supportLevel),'Invalid event policy');
    if(e.eventType==='AI_CHALLENGE_STARTED'){require(!!e.challengeId&&!claims.has(e.challengeId),'Invalid challenge start');claims.set(e.challengeId!,e.taskId+e.stage);}
    if(['AI_CHALLENGE_RESPONSE','AI_CHALLENGE_FOLLOW_UP'].includes(e.eventType))require(!!e.challengeId&&claims.get(e.challengeId)===e.taskId+e.stage,'Unlinked challenge event');
-   if(e.coach){require(['demo','deepseek'].includes(e.coach.provider)&&typeof e.coach.model==='string'&&e.coach.model.length>0&&['0.6','0.6.2'].includes(e.coach.STEMPathVersion)&&e.coach.promptVersion===s.promptVersion,'Invalid response metadata');require(e.coach.responseMode===(e.coach.provider==='demo'?'demo':'ai'),'Provider/mode mismatch');const u=e.coach.tokenUsage;if(u)require(Object.values(u).every(nonnegative)&&u.totalTokens===u.inputTokens+u.outputTokens,'Invalid response token usage');}
+   if(e.coach){require(['demo','deepseek'].includes(e.coach.provider)&&typeof e.coach.model==='string'&&e.coach.model.length>0&&['0.6','0.6.2','0.7'].includes(e.coach.STEMPathVersion)&&e.coach.promptVersion===s.promptVersion,'Invalid response metadata');require(e.coach.responseMode===(e.coach.provider==='demo'?'demo':'ai'),'Provider/mode mismatch');const u=e.coach.tokenUsage;if(u)require(Object.values(u).every(nonnegative)&&u.totalTokens===u.inputTokens+u.outputTokens,'Invalid response token usage');}
    if(!s.config.storeMessageText)require(e.messageText===undefined,'Text present with capture OFF');
   }
   for(const list of [s.supportHistory,s.artifactRevisions,s.stageTimings])require(Array.isArray(list)&&list.length<=20000,'Invalid history collection');

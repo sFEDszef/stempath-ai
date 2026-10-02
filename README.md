@@ -1,3 +1,9 @@
+## v0.7 — Participant Accounts & Server Persistence
+
+Current Vercel production defaults to `PERSISTENCE_MODE=local` and `AUTH_MODE=disabled`; no PostgreSQL or login is required. The same source supports a future authenticated PostgreSQL pilot with independent Participant Code + PIN accounts, server-owned projects, seven-stage records and conversations. See [v0.7 setup, security, migrations, backups and ECS readiness](docs/v0.7-server-persistence.md).
+
+Account mode requires explicit migrations and operator bootstrap; it is not activated on stempathai.com. `STUDENT_TASK_MODE=ASSIGNED` supports researcher-assigned task revisions and study conditions. Docker/Compose configuration is provided for later ECS deployment after ICP approval and HTTPS/restore testing.
+
 ## v0.6.2 — Young Learner Guided Journey & Durable Learning State
 
 Projects now resume stage conversations and notebooks automatically on the same device. See [v0.6.2 learning flow](docs/young-learner-journey.md) for migration, privacy boundaries and deterministic checkpoints.
@@ -67,13 +73,13 @@ This validates and dispatches a local event consumed by the mounted TaskWorkspac
 - `LearningArtifacts.tsx`, `AIChallenge.tsx`: thinking records and claim evaluation using existing card styling.
 - `Workspace.tsx`, `AIChat.tsx`, sidebars: shared stage state, completion, conversations, loading, errors and retry.
 
-The server receives the active task, stage, support level, recent 12 messages, latest message, learner records and completed stages. There is no server-side conversation memory to leak between tasks. A late reply for an unmounted task is ignored. Task-aware key questions and artifact schemas are derived locally; AI chat and claims adapt through the server context.
+The server receives the active task, stage, support level, recent 12 messages, latest message, learner records and completed stages. In LOCAL mode there is no server-side conversation memory. In POSTGRES mode persisted messages belong to an authenticated user/project and requests still use bounded context. A late reply for an unmounted task is ignored. Task-aware key questions and artifact schemas are derived locally; AI chat and claims adapt through the server context.
 
 See [the pedagogical matrix](docs/pedagogy.md) for student/coach responsibilities, avoided behaviors and examples at every support level.
 
 ## Storage and research boundaries
 
-Active task, current stage, completion, support and text records persist in versioned sessionStorage for the current tab. Chat and image previews stay in memory and reset on reload. Notes use task-scoped localStorage; the original demo notebook is still readable. No database, student account or remote analytics has been added. v0.5 records anonymous research events locally. Browser storage is fallible and is not a research archive.
+LOCAL mode persists projects, stage conversations, checkpoints and notebooks on the same browser under the v0.6.2 storage/migration rules. Images remain transient previews. POSTGRES mode keeps account projects, visible conversations, progress and research linkage on the server with version checks; it does not import anonymous browser projects. Research text capture defaults OFF. Browser storage is fallible and is not a research archive.
 
 Images remain local previews; AI does not analyze them. In real AI mode, recent text and records are sent to DeepSeek through the server. Only server code reads `DEEPSEEK_API_KEY`; `.env.example` remains blank. No credentials are needed for the demo or tests. Provider data retention policies apply; do not enter personal or sensitive information.
 

@@ -17,6 +17,7 @@ export interface Message {
   suggestions?: string[];
 }
 export interface ChatRequest {
+  projectId?:string;
   interfaceLanguage?: "zh-CN"|"en";
   taskLanguage?: "zh-CN"|"en";
   stage: StageId;
@@ -87,7 +88,7 @@ export interface StagePedagogy {
 
 export interface CoachMetadata {
  provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
- STEMPathVersion:'0.6'|'0.6.2';promptVersion:'deepseek-v2'|'young-learner-v3';
+ STEMPathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3';
  providerAttempted?:boolean;diagnostic?:string;compliance?:'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_FALLBACK_DEMO';
  tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
  fallbackReason?:string;

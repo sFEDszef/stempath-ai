@@ -70,7 +70,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
   const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngQuestion({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
-  const adaptiveRequest:ChatRequest={interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:boundedHistory(messages),artifacts:records,completed,mode,research:config};
+  const adaptiveRequest:ChatRequest={projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:boundedHistory(messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
   useEffect(()=>{researchLanguage(lang);},[lang,researchLanguage]);
@@ -170,7 +170,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   async function send(text: string, claim?:string) {
     if (!text.trim() || (pendingRef.current.size>0||research.busy)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
-    const request:ChatRequest = {interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:boundedHistory(messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
+    const request:ChatRequest = {projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:boundedHistory(messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
     adaptive.onStudentTurn();
     const decision=decidePedagogicalAction({...request,message:text.trim()});
     research.event('MESSAGE_SENT',{messageText:text.trim(),learnerSignal:Object.entries(decision.state.signals).filter(([,v])=>v).map(([key])=>key),pedagogicalDecision:decision.action,supportRecommendation:decision.recommendation});
@@ -239,7 +239,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
             mode={responseMode??(mode==="auto"?undefined:mode)}
             stage={stage}
             level={level}
-            messages={messages.map(m=>m.suggestions?{...m,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}:m)}
+            messages={messages.map(m=>m.role==='assistant'&&m.suggestions?.length?{...m,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}:m)}
             busy={(pending.length>0||research.busy)}
             onSend={text=>void send(text)}
             error={chatErrors[active]??(!pending.length&&messages.at(-1)?.role==='student'?{message:t("The coach could not respond. Please retry."),retryable:true}:undefined)}

@@ -1,4 +1,3 @@
-# Validation only: build the Next.js server application; do not deploy to Pages.
 name: Validate STEMPath AI
 on:
   push:
@@ -11,6 +10,22 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-bookworm
+        env:
+          POSTGRES_USER: stempath_test
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: stempath_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U stempath_test -d stempath_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PERSISTENCE_MODE: local
+      AUTH_MODE: disabled
+      AI_PROVIDER: demo
+      TEST_DATABASE_URL: postgres://stempath_test:isolated_ci_only@localhost:5432/stempath_test
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v4
@@ -22,6 +37,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
-      - run: pnpm test
       - run: pnpm typecheck
+      - run: pnpm test
       - run: pnpm build
+      - name: Build ECS application and migration images
+        run: |
+          docker build --target runner -t stempath-app:ci .
+          docker build --target tooling -t stempath-tooling:ci .
+      - name: Validate Compose with disposable placeholders
+        env:
+          POSTGRES_PASSWORD: isolated_ci_only
+          DATABASE_URL: postgres://stempath_test:isolated_ci_only@postgres:5432/stempath_test
+          SESSION_SECRET: isolated-ci-session-secret-never-production
+        run: docker compose config --quiet

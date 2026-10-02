@@ -1,0 +1,49 @@
+# Copy .env.example into an untracked .env and supply secrets before running.
+services:
+  postgres:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: stempath
+      POSTGRES_USER: stempath
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a strong POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stempath -d stempath"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build:
+      context: .
+      target: tooling
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL with host postgres for Compose}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+  app:
+    build:
+      context: .
+      target: runner
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      PERSISTENCE_MODE: postgres
+      AUTH_MODE: participant
+      STUDENT_TASK_MODE: ${STUDENT_TASK_MODE:-ASSIGNED}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET:?Set a random SESSION_SECRET}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-demo}
+      AI_MODEL: ${AI_MODEL:-deepseek-flash}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  postgres_data:
