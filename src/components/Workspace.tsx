@@ -4,8 +4,6 @@ import {
   Lightbulb,
   ChevronRight,
   X,
-  ArrowRight,
-  Save,
 } from "lucide-react";
 import { Header } from "./Header";
 import { ProgressSidebar } from "./ProgressSidebar";
@@ -15,23 +13,26 @@ import { STEMJourney } from "./STEMJourney";
 import { ArtifactUploader } from "./ArtifactUploader";
 import { HelpMeter } from "./HelpMeter";
 import {useI18n} from "@/lib/i18n";
-import type {Project} from "@/lib/projects/storage";
+import {StageCheckpoint} from "./StageCheckpoint";
+import {boundedHistory} from "@/lib/stem/context";
+import {youngQuestion} from "@/lib/stem/youngLearner";
+import {targetGradeBand} from "@/lib/stem/gradeBands";
+import {checkpointState,accessibleStage,nextStage,childStageNames} from "@/lib/stem/stageCheckpoints";
+import type {Project,ProjectProgress} from "@/lib/projects/storage";
 import { getStages, keyQuestions, pedagogy } from "@/lib/stem/stages";
 
 import { useAdaptive } from "@/lib/pedagogy/useAdaptive";
 import { ResearchPanel } from "./ResearchPanel";
 import type { ResearchController } from "@/lib/research/useResearchSession";
 import { conditionConfig, initialLevel, aiEnabled, type ResearchConfig } from "@/lib/research/config";
-import { sessionSummary, type Choice } from "@/lib/research/session";
+import { type Choice } from "@/lib/research/session";
 import { decidePedagogicalAction } from "@/lib/pedagogy/decisionEngine";
-import { readiness } from "@/lib/pedagogy/decisionEngine";
 import { suggestedReplies } from "@/lib/pedagogy/responses";
 import { SupportRecommendation } from "./SupportRecommendation";
-import { LearningArtifacts } from "./LearningArtifacts";
 import { AIChallenge } from "./AIChallenge";
 import { CoachError } from "@/lib/coach";
 import type { Artifact, Message, StageId, SupportLevel, ChatRequest, STEMTask, LearningArtifacts as Thinking } from "@/types";
-export default function Workspace({task,initialProject,onProgress,onNavigate,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{initialProject:Project;onProgress:(p:Pick<Project,"active"|"completed"|"level"|"records">)=>void;onNavigate:(name:string)=>void;task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
+export default function Workspace({task,initialProject,saveStatus,onSaveRetry,onProgress,onNavigate,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{initialProject:Project;saveStatus:"saved"|"saving"|"failed";onSaveRetry:()=>void;onProgress:(p:ProjectProgress)=>void;onNavigate:(name:string)=>void;task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
   const {t,locale}=useI18n();
   const config=research.session?.config??conditionConfig();
   const coachEnabled=aiEnabled(config),finished=!!research.session?.completedAt;
@@ -40,7 +41,8 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   const challengeRef=useRef<{id:string;stage:StageId}|null>(null);
   const suggestionRef=useRef('');
   const {event:researchEvent,language:researchLanguage}=research;
-  const stages=getStages(task).map(s=>({...s,title:locale==="zh-CN"?t(`stage.${s.id}`):s.title,description:t(s.description),question:t(s.question)}));
+  const primary=targetGradeBand(task)!=="G7+";
+  const stages=getStages(task).map(s=>({...s,title:primary?(locale==="zh-CN"&&s.id==="build"&&/inquiry|investigation/.test(task.type)?"开始探究":childStageNames[s.id][locale==="zh-CN"?0:1]):locale==="zh-CN"?t(`stage.${s.id}`):s.title,description:primary?({understand:["任务要做什么","Find the goal"],imagine:["想一个办法","Think of an idea"],plan:["准备怎么做","Plan a small step"],build:["亲手试一试","Try your plan"],test:["看看结果","Look at the result"],improve:["试着改一点","Try a small change"],reflect:["说说学到了什么","Share what you learned"]}[s.id][locale==="zh-CN"?0:1]):t(s.description),question:primary?youngQuestion({task,stage:s.id,level:1,message:"",history:[],artifacts:{},completed:[]},locale==="zh-CN"):t(s.question)}));
   const [records,setRecords]=useState<Thinking>(initialProject.records);
   const [restored,setRestored]=useState(false);
   const [mode,setMode]=useState<'auto'|'deepseek'|'demo'>('auto');
@@ -54,21 +56,21 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   const [level, setLevel] = useState<SupportLevel>(initialProject.level??initialLevel(config.condition));
   const [conversations, setConversations] = useState<
     Partial<Record<StageId, Message[]>>
-  >({});
+  >(initialProject.conversations);
   const [pending, setPending] = useState<StageId[]>([]);
   const pendingRef = useRef(new Set<StageId>());
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const artifactRef = useRef<Artifact[]>([]);
   const uploadRef = useRef<HTMLInputElement>(null);
   const [modal, setModal] = useState<string | null>(null);
-  const [note, setNote] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [note, setNote] = useState(initialProject.notebook);
+  const [challenges,setChallenges]=useState(initialProject.challenges);
   const [chatErrors, setChatErrors] = useState<Partial<Record<StageId, {message:string; retryable:boolean; request:ChatRequest}>>>({});
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
-  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${t(pedagogy[active].questions[0])}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
-  const adaptiveRequest:ChatRequest={interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:messages.slice(-12).map(({role,text})=>({role,text})),artifacts:records,completed,mode,research:config};
+  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngQuestion({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
+  const adaptiveRequest:ChatRequest={interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:boundedHistory(messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
   useEffect(()=>{researchLanguage(lang);},[lang,researchLanguage]);
@@ -80,12 +82,17 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   function changeLevel(next:SupportLevel){if(!manualSupport||next===level||(pendingRef.current.size>0||research.busy))return;research.support(next,'STUDENT');setLevel(next);void deliver({...adaptiveRequest,level:next,previousLevel:level,intent:'support-change',message:locale==='zh-CN'?'请调整帮助。':'Please adjust the guidance.'});}
   function recordArtifact(field:string,value:string){const key=`${active}:${field}`;if(lastArtifacts.current[key]===value||(!value&&!lastArtifacts.current[key]))return;lastArtifacts.current[key]=value;research.artifact(active,field,value);}
 
+  const checkpoint=checkpointState(task,active,records,completed);
+  const readyRef=useRef('');
+  useEffect(()=>{const key=checkpoint.status==='READY'?active:'';if(key&&readyRef.current!==key)researchEvent('STAGE_READY',{systemAction:'MINIMUM_CHECKPOINT_NOT_MASTERY'},active);readyRef.current=key;},[checkpoint.status,active,researchEvent]);
   function completeStage(force=false){
-    if(finished)return;
-    if(completed.includes(active)){setCompleted(prev=>prev.filter(id=>id!==active));research.complete(active,false);return;}
-    const missing=readiness(task,active,records).filter(field=>coachEnabled||!field.includes('AI'));
-    if(!force&&missing.length){setCompletionWarning(missing);return;}
-    setCompleted(prev=>[...prev,active]);setCompletionWarning([]);research.complete(active,true);
+    if(finished||pendingRef.current.size||research.busy)return;
+    const missing=checkpoint.missing;
+    if(!completed.includes(active)&&missing.length&&!(force&&researchVisible)){setCompletionWarning([locale==='zh-CN'?missing[0].zh:missing[0].en]);return;}
+    if(force&&researchVisible&&missing.length)research.event('STAGE_OVERRIDE',{systemAction:'TEACHER_FORCE_CONTINUE'});
+    if(!completed.includes(active)){setCompleted(prev=>[...prev,active]);research.complete(active,true);}
+    setCompletionWarning([]);const next=nextStage(active);
+    if(next)enterStage(next);else research.finish();
   }
   function chooseSupport(accept:boolean){
     if(!adaptive.showRecommendation||(pendingRef.current.size>0||research.busy)||finished)return;
@@ -93,7 +100,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
     research.event(fade?(accept?'FADING_ACCEPTED':'FADING_REJECTED'):(accept?'ESCALATION_ACCEPTED':'ESCALATION_REJECTED'),{supportRecommendation:adaptive.decision.recommendation,fadingAccepted:fade?accept:undefined,escalationAccepted:!fade?accept:undefined});
     const next=adaptive.resolveRecommendation(accept);
     if(accept&&next){research.support(next,'SYSTEM_RECOMMENDATION');setLevel(next);
-      const history=messages.slice(-12).map(({role,text})=>({role,text}));
+      const history=boundedHistory(messages);
       void deliver({...adaptiveRequest,level:next,previousLevel:level,history,intent:'support-change',message:locale==='zh-CN'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
     }
   }
@@ -102,7 +109,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
       research.event('WORKSPACE_RESTORED',{systemAction:'SAVED_PROJECT'});
       research.stage(initialProject.active);research.support(initialProject.level,'STUDENT');
       for(const id of initialProject.completed)research.complete(id,true);
-      setNote(localStorage.getItem(`stempath-notebook-project-${initialProject.id}`)??'');
+
     } catch {
       // Storage may be unavailable; the notebook remains usable in memory.
     }
@@ -111,17 +118,19 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   // TaskWorkspace remounts this workspace for every loaded task.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(()=>{if(restored)onProgress({records,completed,active,level});},[records,completed,active,level,restored,onProgress]);
+  useEffect(()=>{if(restored)onProgress({records,completed,active,level,conversations,notebook:note,challenges});},[records,completed,active,level,conversations,note,challenges,restored,onProgress]);
   useEffect(() => {
     if (modal) dialog.current?.showModal();
     else dialog.current?.close();
   }, [modal]);
-  function selectStage(id: StageId) {
+  function selectStage(id:StageId){if(!accessibleStage(id,active,completed,researchVisible))return;if(researchVisible&&!accessibleStage(id,active,completed))research.event("STAGE_OVERRIDE",{systemAction:"TEACHER_FREE_NAVIGATION"});enterStage(id);}
+  function enterStage(id: StageId) {
     research.stage(id);
     setActive(id);
+    requestAnimationFrame(()=>{const el=document.getElementById("main");el?.focus();el?.scrollIntoView({behavior:"smooth"});});
     setCompletionWarning([]);
     setConversations((prev) =>
-      prev[id]
+      prev[id]?.length
         ? prev
         : {
             ...prev,
@@ -129,7 +138,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                text: locale==='zh-CN'?`接下来探索“${task.title}”的 ${stages.find(s=>s.id===id)!.title} 阶段。你准备先思考什么？`:`For “${task.title}”, let’s explore ${stages.find((s) => s.id === id)!.title}.\n\n${t(pedagogy[id].questions[0])}`,
+                text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngQuestion({...adaptiveRequest,stage:id,history:[],message:""},locale==='zh-CN')}`,
                 suggestions: suggestedReplies(locale==='zh-CN'?'zh':'en'),
               },
             ],
@@ -161,7 +170,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   async function send(text: string, claim?:string) {
     if (!text.trim() || (pendingRef.current.size>0||research.busy)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
-    const request:ChatRequest = {interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:messages.slice(-12).map(({role,text})=>({role,text})),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
+    const request:ChatRequest = {interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:boundedHistory(messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
     adaptive.onStudentTurn();
     const decision=decidePedagogicalAction({...request,message:text.trim()});
     research.event('MESSAGE_SENT',{messageText:text.trim(),learnerSignal:Object.entries(decision.state.signals).filter(([,v])=>v).map(([key])=>key),pedagogicalDecision:decision.action,supportRecommendation:decision.recommendation});
@@ -173,6 +182,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
   }
   function retry() {
     const failed = chatErrors[active];
+    if(!failed&&messages.at(-1)?.role==='student'){void deliver({...adaptiveRequest,message:messages.at(-1)!.text,history:boundedHistory(messages.slice(0,-1))});return;}
     // Reuse the failed turn without adding another student bubble; honour the current meter.
     if (failed?.retryable) void deliver({...failed.request,level,mode,research:config});
   }
@@ -207,16 +217,18 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
           stages={stages}
           active={active}
           completed={completed}
+          locked={stages.filter(s=>!accessibleStage(s.id,active,completed,researchVisible)).map(s=>s.id)}
           onStage={selectStage}
           onTool={navigate}
         />
-        <main id="main" className="main-workspace">
+        <main tabIndex={-1} id="main" className="main-workspace">
           <div className="breadcrumb">
             <button onClick={() => navigate("Challenges")}>{t("Challenges")}</button>
             <ChevronRight size={13} />
             <span>{task.title}</span><button onClick={onLoadTask}>{t("Load STEM Challenge")}</button>
           </div>
           <ChallengeCard task={task} />
+          <p className="save-status" role="status">{t(saveStatus==='saved'?'Saved':saveStatus==='saving'?'Saving…':'Save failed')}{saveStatus==='failed'&&<button onClick={onSaveRetry}>{t('Retry saving')}</button>}</p>
           {coachEnabled&&researchVisible&&<div className="coach-mode"><label>{t("Coach mode")}<select aria-label={t("Coach mode")} value={mode} onChange={e=>{research.event('CONFIG_CHANGED',{systemAction:'MODE_'+e.target.value.toUpperCase()});setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">{t("Auto · AI when available")}</option><option value="deepseek">{t("DeepSeek · real AI only")}</option><option value="demo">{t("Demo · local practice")}</option></select></label><span>{responseMode==='demo'?t("Demo response · local guidance"):responseMode==='ai'?t("DeepSeek · real AI response"):mode==='deepseek'?t("DeepSeek only · errors allow retry."):t("Practice with Demo when AI is unavailable.")}</span></div>}
           <AIChat
             researchVisible={researchVisible}
@@ -230,17 +242,17 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
             messages={messages.map(m=>m.suggestions?{...m,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}:m)}
             busy={(pending.length>0||research.busy)}
             onSend={text=>void send(text)}
-            error={chatErrors[active]}
+            error={chatErrors[active]??(!pending.length&&messages.at(-1)?.role==='student'?{message:t("The coach could not respond. Please retry."),retryable:true}:undefined)}
             onRetry={retry}
             onUpload={onUpload}
+            completionLabel={t(active==='reflect'?'Finish Project':'Finish & Go to Next Step')}
             onComplete={()=>completeStage()}
             complete={completed.includes(active)}
             onLevel={changeLevel}
           />
-          {completionWarning.length>0&&<section className="rail-section" role="alert"><p>{locale==='zh-CN'?t("你可以继续，但以下思考记录还不完整："):t("You can continue, but these thinking records are still missing:")} {completionWarning.map(t).join(', ')}</p><button onClick={()=>setCompletionWarning([])}>{locale==='zh-CN'?t("返回补充"):t("Go back")}</button><button onClick={()=>completeStage(true)}>{locale==='zh-CN'?t("仍然继续"):t("Continue anyway")}</button></section>}
-          {active==='reflect'&&completed.includes('reflect')&&research.session&&<section className="rail-section completion-summary"><h2>{t("Your learning journey")}</h2><p>{t("Stages completed:")}{sessionSummary(research.session).stages}{t("· Thinking-record revisions:")}{sessionSummary(research.session).revisions}{t("· Evidence-related messages:")}{sessionSummary(research.session).evidence}{t("· AI challenges considered:")}{sessionSummary(research.session).challenges}{t("· Support changes:")}{sessionSummary(research.session).supportChanges}</p><p>{finished?t("This session is complete. You can review your notes or load a challenge to begin again."):t("These describe your activity, not a score.")}</p>{!finished&&<button className="primary-button" disabled={pending.length>0} onClick={research.finish}>{t("Finish learning session")}</button>}</section>}
+          {completionWarning.length>0&&<section className="rail-section" role="alert"><p>{t('One more thing:')} {completionWarning[0]}</p>{researchVisible&&<button onClick={()=>completeStage(true)}>{t('Force Continue (teacher)')}</button>}</section>}
+          {completed.includes('reflect')&&<section className="rail-section completion-summary"><h2>{t('Project complete!')}</h2><p>{t('You can revisit your steps and notes.')}</p></section>}
           {researchVisible&&<ResearchPanel research={research} task={task} decision={adaptive.decision} onReset={onResearchReset} onClear={onResearchClear} onTask={onAssignTask} onHide={onHideResearch}/>}
-          {completed.includes(active)&&stages.findIndex(s=>s.id===active)<6&&<button className="primary-button next-stage" onClick={()=>selectStage(stages[stages.findIndex(s=>s.id===active)+1].id)}>{t("Continue to")}{stages[stages.findIndex(s=>s.id===active)+1].title}<ArrowRight size={14}/></button>}
           <p className="workspace-footer">
             <span>{t("Every question is a step forward.")}</span>
             <span>{t("STEMPath AI · Research prototype")}</span>
@@ -250,7 +262,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
           <details className="rail-section questions"><summary>{t("Key Questions")}</summary>
             <h2>
               <Lightbulb size={18} />{t("Key Questions")}</h2>
-            {(locale==='zh-CN'?pedagogy[active].questions.map(t):keyQuestions(task,active)).map((question, i) => (
+            {(primary?[youngQuestion(adaptiveRequest,locale==='zh-CN')]:(locale==='zh-CN'?pedagogy[active].questions.map(t):keyQuestions(task,active))).map((question, i) => (
               <div className="question" key={question}>
                 <span>{t("0")}{i + 1}</span>
                 <p>{question}</p>
@@ -261,10 +273,12 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
             stages={stages}
             active={active}
             completed={completed}
-            onStage={selectStage}
+            locked={stages.filter(s=>!accessibleStage(s.id,active,completed,researchVisible)).map(s=>s.id)}
+          onStage={selectStage}
           />
-          <LearningArtifacts key={active} task={task} stage={active} records={records} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))} onRecord={recordArtifact} disabled={finished} aiAvailable={coachEnabled}/>
-          <details className="rail-section"><summary>{t("Your uploaded images")}</summary><ArtifactUploader
+          <StageCheckpoint task={task} stage={active} records={records} messages={messages} aiUsed={coachEnabled} onChange={(field,value)=>setRecords(prev=>({...prev,[active]:{...prev[active],[field]:value}}))} onRecord={recordArtifact} disabled={finished}/>
+
+          <details className="rail-section"><summary>{t("Your uploaded images")}</summary><p>{t("Images last only until you leave this workspace.")}</p><ArtifactUploader
             artifacts={artifacts}
             onUpload={onUpload}
             onRemove={removeArtifact}
@@ -272,7 +286,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
           </details>
           {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport||(pending.length>0||research.busy)}/>}
           {coachEnabled&&<p className="support-status" aria-live="polite">{locale==='zh-CN'?t("AI 支持"):t("AI support")}{t(":")}{adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(locale==='zh-CN'?'可以尝试更具体的提示':'A stronger hint is available'):(locale==='zh-CN'?'可以尝试更独立地思考':'Ready to try more independently')):(locale==='zh-CN'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
-          {!finished&&adaptive.decision.challengeEligible&&<AIChallenge generateResponse={research.generate} language={locale==='zh-CN'?'zh':'en'} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={(pending.length>0||research.busy)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
+          {!finished&&coachEnabled&&(adaptive.decision.challengeEligible||!!challenges[active]?.claim)&&<AIChallenge initial={challenges[active]} onSave={value=>setChallenges(prev=>({...prev,[active]:value}))} generateResponse={research.generate} language={locale==='zh-CN'?'zh':'en'} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={(pending.length>0||research.busy)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
 
         </aside>
       </div>
@@ -335,26 +349,10 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
               value={note}
               onChange={(e) => {
                 setNote(e.target.value);
-                setSaved(false);
+
               }}
               placeholder={t("I wonder… / 我的发现…")}
             />
-            <button
-              className="primary-button"
-              onClick={() => {
-                try {
-                  localStorage.setItem(`stempath-notebook-project-${initialProject.id}`, note);
-                  setSaved(true);
-                } catch {
-                  setError(
-                    "Your browser could not save the notebook. Copy your notes before leaving.",
-                  );
-                }
-              }}
-            >
-              <Save size={16} />
-              {saved ? t("Saved in this browser") : t("Save notes")}
-            </button>
             <small>{t("Your notebook stays on this device.")}</small>
           </div>
         ) : modal === "My Files" ? (
@@ -364,7 +362,7 @@ export default function Workspace({task,initialProject,onProgress,onNavigate,onL
             onRemove={removeArtifact}
           />
         ) : (
-          <div className="help-content"><p>{t('Choose a stage, record your thinking and mark it complete when ready. You can reopen any stage.')}</p><p>{t('Choose questions, a hint or a thinking framework. AI suggestions can be wrong; check them with evidence.')}</p><p>{t('Projects and notes stay in this browser. Conversations and images reset when you leave the workspace. No cross-device sync.')}</p></div>
+          <div className="help-content"><p>{t('Choose a stage, record your thinking and mark it complete when ready. You can reopen any stage.')}</p><p>{t('Choose questions, a hint or a thinking framework. AI suggestions can be wrong; check them with evidence.')}</p><p>{t('Projects, conversations and notes are saved on this device. Images are temporary. No cross-device sync.')}</p></div>
         )}
       </dialog>
     </>

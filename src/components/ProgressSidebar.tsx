@@ -10,12 +10,14 @@ import {
 
 import type { Stage, StageId } from "@/types";
 export function ProgressSidebar({
+  locked=[],
   stages,
   active,
   completed,
   onStage,
   onTool,
 }: {
+  locked?:StageId[];
   stages: Stage[];
   active: StageId;
   completed: StageId[];
@@ -32,6 +34,8 @@ export function ProgressSidebar({
         {stages.map((stage, i) => (
           <li key={stage.id}>
             <button
+              disabled={locked.includes(stage.id)}
+              title={locked.includes(stage.id)?t("Upcoming"):undefined}
               onClick={() => onStage(stage.id)}
               className={`stage-button ${active === stage.id ? "active" : ""} ${completed.includes(stage.id) ? "completed" : ""}`}
               aria-current={active === stage.id ? "step" : undefined}

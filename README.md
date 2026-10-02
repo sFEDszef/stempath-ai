@@ -1,3 +1,7 @@
+## v0.6.2 — Young Learner Guided Journey & Durable Learning State
+
+Projects now resume stage conversations and notebooks automatically on the same device. See [v0.6.2 learning flow](docs/young-learner-journey.md) for migration, privacy boundaries and deterministic checkpoints.
+
 # Official website
 
 [STEMPath AI](https://stempathai.com) · [Research mode](https://stempathai.com/?research=1)

@@ -1,10 +1,11 @@
 import {initialSnapshot,taskTrace,tick,durations,type ConfigSnapshot,type ActivityClock,type StartContext} from './reliability';
+import {targetGradeBand} from '@/lib/stem/gradeBands';
 import { demoTasks } from '@/data/tasks';
 import type { CoachMetadata, StageId, STEMTask, SupportLevel, TaskType } from '@/types';
 import type { ResearchConfig, Condition } from './config';
 import { initialLevel } from './config';
 export type Initiator='STUDENT'|'SYSTEM_RECOMMENDATION'|'RESEARCH_CONDITION';
-export type EventType='CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
+export type EventType='STAGE_READY'|'STAGE_OVERRIDE'|'CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
 export type Choice='AGREE'|'DISAGREE'|'NEED_EVIDENCE';
 export interface EventData {
  diagnostic?:string;reasonCategory?:string;
@@ -17,13 +18,13 @@ export interface EventData {
  laterRevision?:'ACCEPTED_CLAIM'|'REJECTED_CLAIM'|'UNCERTAIN';challengeId?:string;
 }
 export interface InteractionEvent extends EventData {eventId:string;sessionId:string;timestamp:string;taskId:string;stage:StageId;condition:Condition;supportLevel:SupportLevel;eventType:EventType}
-export interface TaskRun {taskDefinitionId:string;taskRevision:number;taskSnapshotHash:string;taskId:string;taskRunId?:string;definitionId?:string;catalogTaskId?:string;type:TaskType;startedAt:string;completedAt?:string;completedStages:StageId[];title?:string;description?:string}
+export interface TaskRun {targetGradeBand?:import("@/types").TargetGradeBand;taskDefinitionId:string;taskRevision:number;taskSnapshotHash:string;taskId:string;taskRunId?:string;definitionId?:string;catalogTaskId?:string;type:TaskType;startedAt:string;completedAt?:string;completedStages:StageId[];title?:string;description?:string}
 export interface StageTiming {taskId:string;stage:StageId;stageEnteredAt:string;stageExitedAt?:string;durationMs:number}
 export interface SupportChange {timestamp:string;taskId:string;stage:StageId;from?:SupportLevel;to:SupportLevel;initiator:Initiator}
 export interface ArtifactRevision {taskId:string;stage:StageId;artifactType:string;version:number;timestamp:string;characterCount:number;text?:string}
 export interface ResearchSession {
  interfaceLanguage?:"zh-CN"|"en";taskLanguage?:"zh-CN"|"en";
- schemaVersion:'0.6';stempathVersion:'0.6';promptVersion:'deepseek-v2';provider:string;model:string;taskDefinitionVersion:number;
+ schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2';promptVersion:'deepseek-v2'|'young-learner-v3';provider:string;model:string;taskDefinitionVersion:number;
  participantCode?:string;baselineMeasures:Record<string,number>;outcomeMeasures:Record<string,number>;configSnapshot:ConfigSnapshot;activity:ActivityClock;elapsedDurationMs:number;activeDurationMs:number;usage:{aiCalls:number;inputTokens:number;outputTokens:number;totalTokens:number};
  sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE';condition:Condition;config:ResearchConfig;
  language:'en'|'zh';currentStage:StageId;supportLevel:SupportLevel;taskId:string;completedStages:StageId[];
@@ -36,7 +37,7 @@ const uuid=()=>crypto.randomUUID();
 function definitionId(id:string){let a=2166136261,b=5381;for(const c of id){a=Math.imul(a^c.charCodeAt(0),16777619);b=Math.imul(b,33)^c.charCodeAt(0);}return `task-${(a>>>0).toString(16)}${(b>>>0).toString(16)}`;}
 function metadata(task:STEMTask,config:ResearchConfig,now:number):TaskRun {
  // Random run ID rather than potentially identifying custom task IDs/titles.
- const runId=uuid();return {...taskTrace(task),taskDefinitionId:definitionId(task.id),taskId:runId,taskRunId:runId,definitionId:definitionId(task.id),catalogTaskId:demoTasks.find(t=>t.id===task.id&&t.title===task.title&&t.description===task.description)?.id,type:task.type,startedAt:stamp(now),completedStages:[],...(config.storeMessageText?{title:task.title,description:task.description}:{})};
+ const runId=uuid();return {...taskTrace(task),targetGradeBand:targetGradeBand(task),taskDefinitionId:definitionId(task.id),taskId:runId,taskRunId:runId,definitionId:definitionId(task.id),catalogTaskId:demoTasks.find(t=>t.id===task.id&&t.title===task.title&&t.description===task.description)?.id,type:task.type,startedAt:stamp(now),completedStages:[],...(config.storeMessageText?{title:task.title,description:task.description}:{})};
 }
 export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData={},now=Date.now(),stage=s.currentStage,level=s.supportLevel):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
@@ -47,7 +48,7 @@ export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData
 }
 export function startSession(task:STEMTask,config:ResearchConfig,now=Date.now(),context:StartContext={interfaceLanguage:'en',taskLanguage:'en',provider:'auto',model:'pending'}):ResearchSession {
  const run=metadata(task,config,now),level=initialLevel(config.condition);
- return recordEvent({schemaVersion:'0.6',stempathVersion:'0.6',promptVersion:'deepseek-v2',provider:context.provider,model:context.model,taskDefinitionVersion:task.taskRevision??1,interfaceLanguage:context.interfaceLanguage,taskLanguage:context.taskLanguage,baselineMeasures:{},outcomeMeasures:{},configSnapshot:{...initialSnapshot(task,config,now,context),taskDefinitionId:run.taskDefinitionId},activity:{lastTick:now,lastActivity:now,activeDurationMs:0,visible:true,idle:false},elapsedDurationMs:0,activeDurationMs:0,usage:{aiCalls:0,inputTokens:0,outputTokens:0,totalTokens:0},sessionId:uuid(),startedAt:stamp(now),updatedAt:stamp(now),condition:config.condition,config:{...config},language:'en',currentStage:'understand',supportLevel:level,taskId:run.taskId,completedStages:[],interactionCount:0,events:[],tasks:[run],stageTimings:[{taskId:run.taskId,stage:'understand',stageEnteredAt:stamp(now),durationMs:0}],supportHistory:[{timestamp:stamp(now),taskId:run.taskId,stage:'understand',to:level,initiator:'RESEARCH_CONDITION'}],artifactRevisions:[],droppedEvents:0},'SESSION_STARTED',{settings:{...config}},now);
+ return recordEvent({schemaVersion:'0.6',stempathVersion:'0.6.2',promptVersion:'young-learner-v3',provider:context.provider,model:context.model,taskDefinitionVersion:task.taskRevision??1,interfaceLanguage:context.interfaceLanguage,taskLanguage:context.taskLanguage,baselineMeasures:{},outcomeMeasures:{},configSnapshot:{...initialSnapshot(task,config,now,context),taskDefinitionId:run.taskDefinitionId},activity:{lastTick:now,lastActivity:now,activeDurationMs:0,visible:true,idle:false},elapsedDurationMs:0,activeDurationMs:0,usage:{aiCalls:0,inputTokens:0,outputTokens:0,totalTokens:0},sessionId:uuid(),startedAt:stamp(now),updatedAt:stamp(now),condition:config.condition,config:{...config},language:'en',currentStage:'understand',supportLevel:level,taskId:run.taskId,completedStages:[],interactionCount:0,events:[],tasks:[run],stageTimings:[{taskId:run.taskId,stage:'understand',stageEnteredAt:stamp(now),durationMs:0}],supportHistory:[{timestamp:stamp(now),taskId:run.taskId,stage:'understand',to:level,initiator:'RESEARCH_CONDITION'}],artifactRevisions:[],droppedEvents:0},'SESSION_STARTED',{settings:{...config}},now);
 }
 function closeStage(s:ResearchSession,now:number):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));

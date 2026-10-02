@@ -1,4 +1,5 @@
-import type { STEMTask, TaskType } from '@/types';
+import {gradeBands} from './gradeBands';
+import type { STEMTask, TaskType, TargetGradeBand } from '@/types';
 export const taskTypes: TaskType[]=['engineering-design','scientific-inquiry','experimental-investigation','optimization','modelling','general-stem'];
 export function classifyTask(text:string): TaskType {
   const matches: TaskType[]=[];
@@ -17,9 +18,11 @@ export function loadTask(input:unknown):STEMTask {
     if(typeof value!=='string'||value.length>max||(required&&!value.trim()))throw new Error('Check the challenge fields and their length.');
     return value.trim()||undefined;
   }
+  if(v.targetGradeBand!==undefined&&!gradeBands.includes(v.targetGradeBand as TargetGradeBand))throw Error('Invalid target grade band');
   const title=text(v.title,160,true)!; const description=text(v.description,4000,true)!;
   if(v.type!==undefined&&!taskTypes.includes(v.type as TaskType))throw new Error('Unknown task type.');
   const task:STEMTask={id:text(v.id,100)??`task-${hash(title+'\n'+description)}`,title,description,type:(v.type as TaskType)??classifyTask(title+' '+description)};
+  if(v.targetGradeBand)task.targetGradeBand=v.targetGradeBand as TargetGradeBand;
   for(const key of ['context','additionalInstructions','subject','gradeLevel','lessonNumber','teacherNotes','safetyNotes'] as const){const value=text(v[key],2000);if(value)task[key]=value;}
   for(const key of ['objectives','constraints','successCriteria','availableMaterials','relevantDomains','tags'] as const){
     if(v[key]===undefined)continue;

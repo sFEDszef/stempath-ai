@@ -1,5 +1,6 @@
 import { conditionConfig } from '@/lib/research/config';
 import type { ChatRequest, StageId, SupportLevel, STEMTask, LearningArtifacts } from '@/types';
+import { checkpointState } from '@/lib/stem/stageCheckpoints';
 import { artifactFields } from '@/lib/stem/stages';
 import { detectSignals, meaningful, languageOf, type Signals, type Language } from './signals';
 export interface LearnerState {
@@ -16,9 +17,7 @@ export function artifactProgress(task:STEMTask,stage:StageId,records:LearningArt
  return fields.filter(field=>{const text=records[stage]?.[field]??'';return meaningful(text)&&!detectSignals(text,stage).uncertain;});
 }
 export function readiness(task:STEMTask,stage:StageId,records:LearningArtifacts) {
- const required=artifactFields(task,stage).slice(0,3);
- const done=artifactProgress(task,stage,records);
- return required.filter(field=>!done.includes(field));
+ return checkpointState(task,stage,records).missing.map(c=>c.field);
 }
 /** Replays bounded, task-local student turns; no model or network dependency. Scores are indicators, not assessments. */
 export function evaluateLearnerState(request:ChatRequest):LearnerState {

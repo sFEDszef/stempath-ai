@@ -1,7 +1,9 @@
+import {targetGradeBand} from '@/lib/stem/gradeBands';
+import {youngReply} from '@/lib/stem/youngLearner';
 import type { ChatRequest, CoachResponse, StageId } from '@/types';
 import { decidePedagogicalAction } from './decisionEngine';
 import type { Language } from './signals';
-export function suggestedReplies(language:Language){return language==='zh'?['我仍然不确定。','我想解释我的理由。','需要什么证据？']:['I’m still not sure.','I want to explain my reasoning.','What evidence would help?'];}
+export function suggestedReplies(language:Language){return language==='zh'?['我仍然不确定。','我想解释我的理由。','我可以怎样检查？']:['I’m still not sure.','I want to explain my reasoning.','How can I check my idea?'];}
 const questions:Record<StageId,[string,string]>={
  understand:['What is one thing the task says you need to achieve?','任务说你需要达到什么目标？'],
  imagine:['What is one possibility you would like to explore?','你想探索哪一种可能性？'],
@@ -33,6 +35,7 @@ export function adaptiveDemo(request:ChatRequest):CoachResponse {
  if(request.research?.condition==='NO_AI')return {text:'',suggestions:[],mode:'demo'};
  const decision=decidePedagogicalAction(request), s=decision.state, zh=s.language==='zh',i=zh?1:0;
  const context=request.task.successCriteria?.[0]??request.task.objectives?.[0]??request.task.description.slice(0,180);
+ if(targetGradeBand(request.task)!=='G7+'&&request.intent!=='challenge')return {text:youngReply(request,zh),suggestions:suggestedReplies(s.language),mode:'demo'};
  let text:string;
  if(request.intent==='challenge')text=zh?`待验证的说法：一次结果符合“${context}”，就意味着这种方法在所有条件下都有效。你会如何检验？`:`An unverified claim: one result matching “${context}” means this approach works under all conditions. How could you test that?`;
  else if(request.intent==='evaluate-claim'||s.signals.critical)text=zh?'什么证据能帮助你判断这个说法？':'What evidence would help you decide about this claim?';

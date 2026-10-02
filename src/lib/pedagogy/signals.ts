@@ -5,7 +5,7 @@ export function languageOf(text:string, fallback:Language='en'):Language {
  const en=(text.match(/[a-z]+/gi)??[]).length;
  return zh+en===0?fallback:zh>=en?'zh':'en';
 }
-const uncertainty=/\b(?:don['’]?t|do not|still don['’]?t)\s+(?:really\s+)?(?:know|understand)|not\s+(?:really\s+)?sure|no idea|\bhelp\b|tell me.*answer|what should I do|stronger hint|不知道|不确定|不会|不懂|直接告诉我|怎么做|提示|没明白/i;
+const uncertainty=/\b(?:don['’]?t|do not|still don['’]?t)\s+(?:really\s+)?(?:know|understand)|not\s+(?:really\s+)?sure|no idea|\bhelp\b|tell me.*answer|what should I do|stronger hint|不知道|什么意思|没懂|太难了|what does that mean|不确定|不会|不懂|直接告诉我|怎么做|提示|没明白/i;
 const stageTerms:Record<StageId,RegExp>={
  understand:/goal|achiev|must|limit|constraint|criterion|criteria|success|require|目标|限制|条件|达到|成功|要求/i,
  imagine:/idea|hypothes|alternative|compar|possib|assum|instead|想法|假设|比较|另一|方案/i,

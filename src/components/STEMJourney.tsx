@@ -3,11 +3,13 @@ import { Check } from "lucide-react";
 
 import type { Stage, StageId } from "@/types";
 export function STEMJourney({
+  locked=[],
   stages,
   active,
   completed,
   onStage,
 }: {
+  locked?:StageId[];
   stages: Stage[];
   active: StageId;
   completed: StageId[];
@@ -30,6 +32,8 @@ export function STEMJourney({
           <li key={stage.id}>
             <button
               aria-current={stage.id === active ? "step" : undefined}
+              disabled={locked.includes(stage.id)}
+              title={locked.includes(stage.id)?t("Upcoming"):undefined}
               onClick={() => onStage(stage.id)}
               className={
                 stage.id === active

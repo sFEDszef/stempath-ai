@@ -5,6 +5,7 @@ import { ChatMessage } from "./ChatMessage";
 import { supportLabels } from "@/data/challenge";
 import type { Message, Stage, SupportLevel } from "@/types";
 export function AIChat({
+  completionLabel,
   researchVisible=false,
   recommendation,
   mode,
@@ -21,6 +22,7 @@ export function AIChat({
   error,
   onRetry,
 }: {
+  completionLabel?:string;
   researchVisible?:boolean;
   recommendation?: import("react").ReactNode;
   mode?: "ai"|"demo"|"deepseek";
@@ -103,13 +105,13 @@ export function AIChat({
       >
         <div className="chat-date">{t("LET’S EXPLORE TOGETHER")}</div>
         {coachDisabled&&<p className="static-stage-prompt">{sessionFinished?t("Your session is complete. Review your thinking records below."):`${t("Your Thinking")}: ${stage.question}`}</p>}
-        {!coachDisabled&&messages.map((message) => (
+        {(!coachDisabled||sessionFinished)&&messages.map((message) => (
           <ChatMessage
             key={message.id}
             researchVisible={researchVisible}
             message={message}
             onReply={onSend}
-            disabled={busy}
+            disabled={busy||coachDisabled}
           />
         ))}
         {!coachDisabled&&busy && (
@@ -171,9 +173,9 @@ export function AIChat({
       }
       <div className="stage-footer">
         <span>{coachDisabled?t("Space to record your own thinking"):t(supportLabels[level])+t(" · Space to think for yourself")}</span>
-        <button disabled={sessionFinished} onClick={onComplete} className={complete ? "is-complete" : ""}>
+        <button disabled={sessionFinished||busy} onClick={onComplete} className={complete ? "is-complete" : ""}>
           <Check size={14} />
-          {complete ? t("Stage completed") : t("Complete stage")}
+          {completionLabel??(complete ? t("Stage completed") : t("Complete stage"))}
         </button>
       </div>
     </section>

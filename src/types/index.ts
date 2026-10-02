@@ -1,5 +1,6 @@
 export type StageId =
   "understand" | "imagine" | "plan" | "build" | "test" | "improve" | "reflect";
+export type TargetGradeBand = "G3-4" | "G5-6" | "G7+";
 export type SupportLevel = 1 | 2 | 3;
 export interface Stage {
   id: StageId;
@@ -55,6 +56,7 @@ export interface STEMTask {
   type: TaskType;
   subject?: string;
   gradeLevel?: string;
+  targetGradeBand?: TargetGradeBand;
   lessonNumber?: string;
   estimatedMinutes?: number;
   teacherNotes?: string;
@@ -85,7 +87,7 @@ export interface StagePedagogy {
 
 export interface CoachMetadata {
  provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
- STEMPathVersion:'0.6';promptVersion:'deepseek-v2';
+ STEMPathVersion:'0.6'|'0.6.2';promptVersion:'deepseek-v2'|'young-learner-v3';
  providerAttempted?:boolean;diagnostic?:string;compliance?:'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_FALLBACK_DEMO';
  tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
  fallbackReason?:string;

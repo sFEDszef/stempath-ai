@@ -1709,3 +1709,6 @@ button:disabled {cursor:not-allowed;opacity:.55;}
 .site-footer details{margin-top:12px;max-width:850px}.site-footer summary{cursor:pointer;width:fit-content;font-weight:600}
 .site-footer details p{margin:12px 0}.site-footer a:focus-visible,.site-footer summary:focus-visible{outline:2px solid #287561;outline-offset:4px}
 @media(max-width:760px){.header .brand-icon{width:36px;height:36px}.site-footer{padding:24px 16px}}
+
+/* v0.6.2 calm learner checkpoints */
+.save-status{font-size:.78rem;color:#54776a;text-align:right;margin:8px 0}.save-status button{margin-left:8px}.stage-checkpoint h2{display:flex;justify-content:space-between}.stage-checkpoint textarea{width:100%;resize:vertical}.stage-checkpoint label{display:block;margin:12px 0}.checkpoint-ready{color:#23765d;background:#edf8f2;padding:10px;border-radius:8px}.stage-button:disabled,.journey button:disabled{opacity:.45;cursor:not-allowed}.main-workspace:focus{outline:none}
