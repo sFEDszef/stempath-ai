@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
-// Vercel serves both the UI and /api/chat. Static export cannot host API routes.
-const nextConfig: NextConfig = { output: "standalone", images: { unoptimized: true } };
+// Vercel uses its deployment adapter; Docker/ECS uses the standalone Node server.
+// Both outputs preserve server routes. Static export cannot host /api/chat.
+const nextConfig: NextConfig = { output: process.env.VERCEL === '1' ? undefined : 'standalone', images: { unoptimized: true } };
 export default nextConfig;

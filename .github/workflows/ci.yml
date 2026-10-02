@@ -44,6 +44,10 @@ jobs:
         run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build
+      - name: Verify Vercel standard output
+        env:
+          VERCEL: "1"
+        run: pnpm build
       - name: Build ECS application and migration images
         run: |
           docker build --target runner -t stempath-app:ci .
