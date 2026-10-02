@@ -15,4 +15,3 @@ export function adaptiveDemo(request:ChatRequest):CoachResponse {
  const text=youngReply(evaluating?{...request,stage:'test'}:request,zh);
  return {text:evaluating?(zh?'AI也可能说错。我们要找自己检查过的结果。':'AI can be wrong. Look for results you checked yourself.')+'\n\n'+text:text,suggestions:suggestedReplies(decision.state.language),mode:'demo'};
 }
-Recalibrate support levels with v2 policy and one-time migration
