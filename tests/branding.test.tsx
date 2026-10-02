@@ -29,12 +29,22 @@ describe('v0.6.1 public branding',()=>{
   expect(translate('Original Work & Maintenance Statement','zh-CN')).toBe('原创与维护声明');
   expect(translate('Unless explicitly stated otherwise, STEMPath AI currently has no other co-creators or co-maintainers.','zh-CN')).toContain('不设其他共同创建者或共同维护者');
  });
- it('ships a valid original JPEG and references it in favicon and creator metadata',()=>{
+ it('preserves header artwork and attribution while shipping versioned website icons',()=>{
   const bytes=readFileSync('public/brand/tequila-sunset-logo-original.jpg');
   expect([...bytes.subarray(0,3)]).toEqual([255,216,255]);
   const layout=readFileSync('src/app/layout.tsx','utf8');
   expect(layout).toContain('creator: "Tequila Sunset"');
   expect(layout).toContain('authors: [{ name: "Tequila Sunset" }]');
-  expect(layout).toContain('icons: { icon: { url: "/brand/tequila-sunset-logo-original.jpg"');
+  expect(layout).not.toContain('tequila-sunset-logo-original.jpg');
+  expect(layout).toContain('/favicon.ico?v=256e7993ff86');
+  expect(layout).toContain('/brand/stempath-256e7993ff86-180.png');
+  for (const size of [16,32,48,180,192,512]) {
+   const png=readFileSync(`public/brand/stempath-256e7993ff86-${size}.png`);
+   expect([...png.subarray(0,8)]).toEqual([137,80,78,71,13,10,26,10]);
+   expect(png.readUInt32BE(16)).toBe(size);
+   expect(png.readUInt32BE(20)).toBe(size);
+  }
+  const ico=readFileSync('public/favicon.ico');
+  expect([...ico.subarray(0,6)]).toEqual([0,0,1,0,3,0]);
  });
 });
