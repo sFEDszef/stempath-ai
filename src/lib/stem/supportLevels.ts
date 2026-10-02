@@ -1,6 +1,6 @@
 import type { SupportLevel } from '@/types';
 export const SUPPORT_POLICY_VERSION = 'v2' as const;
-export const PROMPT_VERSION = 'young-learner-v4' as const;
+export const PROMPT_VERSION = 'young-learner-v5' as const;
 export type SupportPolicyVersion = 'v1' | 'v2';
 /** Missing markers always identify the historical policy, never the current one. */
 export function supportPolicyVersion(value: unknown): SupportPolicyVersion {

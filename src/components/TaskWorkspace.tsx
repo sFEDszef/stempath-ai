@@ -2,6 +2,7 @@
 import {RemoteProjectStore,platformFetch,type RemoteProject} from '@/lib/persistence/client';
 import type {Account} from '@/lib/server/accounts';
 import {endSession} from '@/lib/research/session';
+import {READINESS_POLICY_VERSION} from '@/lib/stem/readiness';
 import {SUPPORT_POLICY_VERSION,supportPolicyVersion} from '@/lib/stem/supportLevels';
 import type {ResearchSession} from '@/lib/research/session';
 import {useCallback,useEffect,useRef,useState} from 'react';
@@ -34,7 +35,7 @@ function Platform({serverAccount,taskMode='OPEN',onLogout,onAdmin}:Props){
  end('RESET');if(remote.current){flushResearch();await remote.current.settled();}
  const next={...p,lastOpenedAt:new Date().toISOString(),...(config&&!remote.current?{level:initialLevel(config.condition,config.initialSupportLevel)}:{})};saveProjects([next,...projectsRef.current.filter(v=>v.id!==p.id)]);activeRef.current=p.id;
  const prior=remote.current?await remote.current.loadResearch(p.id):undefined;
- if(prior&&supportPolicyVersion(prior.supportPolicyVersion)===SUPPORT_POLICY_VERSION)restoreResearch(prior);else {if(prior&&remote.current)await remote.current.saveResearch(p.id,endSession(prior,'SUPPORT_POLICY_CHANGE'));start(p.task,config,{interfaceLanguage:locale,taskLanguage:p.task.translations?.[locale]?locale:/[\u3400-\u9fff]/.test(p.task.title)?"zh-CN":"en",provider:config?.condition==="NO_AI"?"none":provider,model:config?.condition==="NO_AI"?"none":model});}
+ if(prior&&supportPolicyVersion(prior.supportPolicyVersion)===SUPPORT_POLICY_VERSION&&prior.readinessPolicyVersion===READINESS_POLICY_VERSION)restoreResearch(prior);else {if(prior&&remote.current)await remote.current.saveResearch(p.id,endSession(prior,prior.supportPolicyVersion===SUPPORT_POLICY_VERSION?'READINESS_POLICY_CHANGE':'SUPPORT_POLICY_CHANGE'));start(p.task,config,{interfaceLanguage:locale,taskLanguage:p.task.translations?.[locale]?locale:/[\u3400-\u9fff]/.test(p.task.title)?"zh-CN":"en",provider:config?.condition==="NO_AI"?"none":provider,model:config?.condition==="NO_AI"?"none":model});}
  setActive(next);setView('Workspace');
  }catch(e){setNotice(e instanceof Error?e.message:'Please retry');}},[saveProjects,start,end,locale,flushProjects,flushResearch,restoreResearch]);
  useEffect(()=>{if(remote.current){let alive=true;Promise.all([remote.current.load(),platformFetch<{assignments:{task:STEMTask}[]}>('assignments')]).then(([saved,a])=>{if(!alive)return;projectsRef.current=saved;setProjects(saved);setAssigned(a.assignments.map(v=>loadTask(v.task)));setView('My Projects');setResearchVisible(serverAccount?.role!=='STUDENT');setReady(true);}).catch(e=>{if(alive)setNotice(e.message);});return()=>{alive=false;};}

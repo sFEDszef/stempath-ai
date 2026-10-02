@@ -1,3 +1,5 @@
+Stage progression is now governed separately by [gentle-v1 readiness](gentle-readiness.md). Support levels below remain v2; current prompts are young-learner-v5. The v4 prompt mentioned below describes the original support recalibration release.
+
 # Support policy v2 — recalibrated learning support
 
 The numeric research levels remain **1 / 2 / 3**. New responses use `supportPolicyVersion: "v2"` and `promptVersion: "young-learner-v4"`; app version remains 0.7 and research schema remains 0.6. These numbers no longer mean the same support intensity as policy v1.

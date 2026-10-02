@@ -12,6 +12,7 @@ import {Projects} from '@/lib/server/projects';
 import {ResearchStore,cleanResearch} from '@/lib/server/research';
 import {hashPIN,verifyPIN,cookie,securityHash} from '@/lib/server/security';
 import {platformConfig} from '@/lib/server/config';
+import {attestReadiness} from '@/lib/server/readinessReceipt';
 import {guardedCoach} from '@/lib/server/coachAccess';
 import {platformAPI} from '@/lib/server/api';
 import {demoTasks} from '@/data/tasks';
@@ -54,6 +55,12 @@ describe('normalized project persistence and isolation',()=>{
  it('ASSIGNED requires the assigned exact revision and locks the condition',async()=>{await projects.assign(admin,a.id,demoTasks[1],conditionConfig('HIGH_SUPPORT'));await expect(projects.create(a,demoTasks[0],'ASSIGNED')).rejects.toMatchObject({status:403});const p=await projects.create(a,demoTasks[1],'ASSIGNED');expect(p.level).toBe(3);expect(p.researchConfig.condition).toBe('HIGH_SUPPORT');expect(await projects.assigned(b)).toEqual([]);});
  it('rejects forged assigned task content',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('ADAPTIVE_SUPPORT'));await expect(projects.create(a,{...demoTasks[0],description:'Other task'},'ASSIGNED')).rejects.toMatchObject({status:400});});
  it('NO_AI assignments reject assistant conversations and AI Challenge state',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('NO_AI'));const p=await projects.create(a,demoTasks[0],'ASSIGNED');p.conversations.understand=[{id:'a',role:'assistant',text:'An AI response'}];await expect(projects.save(a,p.id,p,1)).rejects.toMatchObject({status:400});});
+});
+describe('gentle readiness server persistence',()=>{
+ it('one learner record permits explicit completion without a second box',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN');p.records.understand={'Problem statement':'让小车跑起来'};p.completed=['understand'];p.active='imagine';const next=await projects.save(a,p.id,p,1);expect(next.completed).toEqual(['understand']);expect(next.readiness.understand).toMatchObject({ready:true,source:'LOCAL_RECORD'});expect((await projects.get(a,p.id)).readiness).toEqual(next.readiness);});
+ it('accepts server-issued semantic readiness and rejects forged receipts',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN');p.readiness.understand={ready:true,criterion:'BASIC_TASK_GOAL',source:'AI_SEMANTIC',attestation:'f'.repeat(64)};p.completed=['understand'];p.active='imagine';await expect(projects.save(a,p.id,p,1)).rejects.toMatchObject({status:400});p.readiness.understand=attestReadiness(p.id,'understand',{ready:true,criterion:'BASIC_TASK_GOAL',source:'AI_SEMANTIC'});const saved=await projects.save(a,p.id,p,1);expect(saved.readiness.understand?.source).toBe('AI_SEMANTIC');saved.records={};saved.conversations={};const latched=await projects.save(a,p.id,saved,saved.serverVersion);expect(latched.readiness.understand?.ready).toBe(true);});
+ it('migrates old project readiness once without AI or losing notes',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN');p.records.imagine={'Ideas or hypotheses':'把帆变大'};p.notebook='Keep this';await projects.save(a,p.id,p,1);await db.query("UPDATE projects SET readiness_policy_version='checkpoint-v1' WHERE id=$1",[p.id]);await db.query('UPDATE project_stage_state SET readiness=NULL WHERE project_id=$1',[p.id]);const next=await projects.get(a,p.id);expect(next).toMatchObject({readinessPolicyVersion:'gentle-v1',notebook:'Keep this',serverVersion:3,level:2,supportPolicyVersion:'v2'});expect(next.readiness.imagine?.ready).toBe(true);expect(await projects.get(a,p.id)).toEqual(next);});
+ it('NO_AI can progress from one learner record without semantic receipts',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('NO_AI'));const p=await projects.create(a,demoTasks[0],'ASSIGNED');p.records.understand={'Success criteria':'至少3米'};p.completed=['understand'];p.active='imagine';expect((await projects.save(a,p.id,p,1)).completed).toEqual(['understand']);});
 });
 describe('server support policy migration',()=>{
  it('creates new server projects at Level 2 and records v2',async()=>{

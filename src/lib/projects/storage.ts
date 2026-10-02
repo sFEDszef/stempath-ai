@@ -1,3 +1,4 @@
+import {READINESS_POLICY_VERSION,restoreReadiness,type StageReadiness} from '@/lib/stem/readiness';
 import {SUPPORT_POLICY_VERSION,migrateSupportLevel,type SupportPolicyVersion} from '@/lib/stem/supportLevels';
 import {loadTask} from '@/lib/stem/tasks';
 import {parseArtifacts} from '@/lib/stem/validation';
@@ -6,14 +7,15 @@ import type {STEMTask,StageId,SupportLevel,LearningArtifacts,Message} from '@/ty
 export const LIBRARY_KEY='stempath-task-library-v1';
 export const PROJECTS_KEY='stempath-projects-v1';
 export type Conversations=Partial<Record<StageId,Message[]>>;
-export type ProjectProgress=Pick<Project,"active"|"completed"|"level"|"records"|"conversations"|"notebook"|"challenges">;
+export type ProjectProgress=Pick<Project,"active"|"completed"|"level"|"records"|"conversations"|"notebook"|"challenges"|"readiness">;
 export interface SavedChallenge {claim:string;choice:string;revision:string;mode:string;}
-export interface Project {storageVersion:2;supportPolicyVersion:SupportPolicyVersion;conversations:Conversations;notebook:string;challenges:Partial<Record<StageId,SavedChallenge>>;id:string;task:STEMTask;active:StageId;completed:StageId[];level:SupportLevel;records:LearningArtifacts;lastOpenedAt:string;}
-export function newProject(task:STEMTask):Project{return {storageVersion:2,supportPolicyVersion:SUPPORT_POLICY_VERSION,conversations:{},notebook:"",challenges:{},id:crypto.randomUUID(),task:loadTask(task),active:'understand',completed:[],level:2,records:{},lastOpenedAt:new Date().toISOString()};}
+export interface Project {storageVersion:2;readinessPolicyVersion:'gentle-v1';readiness:StageReadiness;supportPolicyVersion:SupportPolicyVersion;conversations:Conversations;notebook:string;challenges:Partial<Record<StageId,SavedChallenge>>;id:string;task:STEMTask;active:StageId;completed:StageId[];level:SupportLevel;records:LearningArtifacts;lastOpenedAt:string;}
+export function newProject(task:STEMTask):Project{return {storageVersion:2,readinessPolicyVersion:READINESS_POLICY_VERSION,readiness:{},supportPolicyVersion:SUPPORT_POLICY_VERSION,conversations:{},notebook:"",challenges:{},id:crypto.randomUUID(),task:loadTask(task),active:'understand',completed:[],level:2,records:{},lastOpenedAt:new Date().toISOString()};}
 export function parseProject(value:unknown):Project {
  if(!value||typeof value!=='object')throw Error('Invalid project');const v=value as Project;
+ if(v.readinessPolicyVersion!==undefined&&v.readinessPolicyVersion!==READINESS_POLICY_VERSION)throw Error('Unsupported readiness policy');
  if(typeof v.id!=='string'||!v.id||v.id.length>100||!stageIds.includes(v.active)||![1,2,3].includes(v.level)||!Array.isArray(v.completed)||v.completed.length>7||!v.completed.every(s=>stageIds.includes(s))||typeof v.lastOpenedAt!=='string'||!Number.isFinite(Date.parse(v.lastOpenedAt)))throw Error('Invalid project');
- return {storageVersion:2,supportPolicyVersion:SUPPORT_POLICY_VERSION,conversations:parseConversations(v.conversations),notebook:typeof v.notebook==='string'?v.notebook:"",challenges:parseChallenges(v.challenges),id:v.id,task:loadTask(v.task),active:v.active,completed:[...new Set(v.completed)],level:migrateSupportLevel(v.level,v.supportPolicyVersion),records:parseArtifacts(v.records),lastOpenedAt:v.lastOpenedAt};
+ return {storageVersion:2,readinessPolicyVersion:READINESS_POLICY_VERSION,readiness:restoreReadiness(loadTask(v.task),parseArtifacts(v.records),parseConversations(v.conversations),v.readiness),supportPolicyVersion:SUPPORT_POLICY_VERSION,conversations:parseConversations(v.conversations),notebook:typeof v.notebook==='string'?v.notebook:"",challenges:parseChallenges(v.challenges),id:v.id,task:loadTask(v.task),active:v.active,completed:[...new Set(v.completed)],level:migrateSupportLevel(v.level,v.supportPolicyVersion),records:parseArtifacts(v.records),lastOpenedAt:v.lastOpenedAt};
 }
 export function readCollection<T>(raw:string|null,parse:(v:unknown)=>T):T[]{if(!raw)return [];try{const value=JSON.parse(raw);if(!Array.isArray(value)||value.length>200)return [];return value.flatMap(item=>{try{return [parse(item)];}catch{return [];}});}catch{return [];}}
 export function importTasks(raw:string):STEMTask[]{const data=JSON.parse(raw);const items=Array.isArray(data)?data:[data];if(!items.length||items.length>100)throw Error('Invalid import');return items.map(loadTask);}
