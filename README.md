@@ -1,3 +1,5 @@
+Current coaching policy: [support policy v2](docs/support-policy-v2.md) — Level 2 is the normal default; Level 3 provides step-by-step rescue support. New research metadata uses young-learner-v4 and an explicit support policy marker.
+
 ## v0.7 — Participant Accounts & Server Persistence
 
 Current Vercel production defaults to `PERSISTENCE_MODE=local` and `AUTH_MODE=disabled`; no PostgreSQL or login is required. The same source supports a future authenticated PostgreSQL pilot with independent Participant Code + PIN accounts, server-owned projects, seven-stage records and conversations. See [v0.7 setup, security, migrations, backups and ECS readiness](docs/v0.7-server-persistence.md).

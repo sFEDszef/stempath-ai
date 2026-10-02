@@ -1,5 +1,8 @@
 # STEMPath AI v0.6.2
 
+Support ladder update: the historical level/prompt descriptions below are superseded by [support policy v2](support-policy-v2.md), with default Level 2, new Level 3 rescue scaffolds and young-learner-v4. Existing research archives retain their original v1 semantics.
+
+
 ## Durable learner state
 The old Workspace owned conversations only in React state; unmounting removed them. Projects now have storageVersion: 2, per-stage conversations (id/role/text/suggestions only), notebook, and per-stage AI Challenge claim/choice/revision alongside the existing task snapshot, records, completed stages, active stage and support level. The existing stempath-projects-v1 collection key remains to allow in-place migration. Valid old projects retain all existing fields; absent conversations start empty. Previous per-project notebook keys are read as a fallback and are not deleted during migration.
 

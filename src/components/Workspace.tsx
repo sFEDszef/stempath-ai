@@ -15,7 +15,7 @@ import { HelpMeter } from "./HelpMeter";
 import {useI18n} from "@/lib/i18n";
 import {StageCheckpoint} from "./StageCheckpoint";
 import {boundedHistory} from "@/lib/stem/context";
-import {youngQuestion} from "@/lib/stem/youngLearner";
+import {youngReply,youngQuestion} from "@/lib/stem/youngLearner";
 import {targetGradeBand} from "@/lib/stem/gradeBands";
 import {checkpointState,accessibleStage,nextStage,childStageNames} from "@/lib/stem/stageCheckpoints";
 import type {Project,ProjectProgress} from "@/lib/projects/storage";
@@ -53,7 +53,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
 
   const [active, setActive] = useState<StageId>(initialProject.active);
   const [completed, setCompleted] = useState<StageId[]>(initialProject.completed);
-  const [level, setLevel] = useState<SupportLevel>(initialProject.level??initialLevel(config.condition));
+  const [level, setLevel] = useState<SupportLevel>(initialProject.level??initialLevel(config.condition,config.initialSupportLevel));
   const [conversations, setConversations] = useState<
     Partial<Record<StageId, Message[]>>
   >(initialProject.conversations);
@@ -69,7 +69,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
-  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngQuestion({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
+  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
   const adaptiveRequest:ChatRequest={projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:boundedHistory(messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
@@ -138,7 +138,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngQuestion({...adaptiveRequest,stage:id,history:[],message:""},locale==='zh-CN')}`,
+                text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngReply({...adaptiveRequest,stage:id,history:[],message:""},locale==='zh-CN')}`,
                 suggestions: suggestedReplies(locale==='zh-CN'?'zh':'en'),
               },
             ],
@@ -285,7 +285,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
           />
           </details>
           {coachEnabled&&<HelpMeter level={level} onChange={changeLevel} disabled={!manualSupport||(pending.length>0||research.busy)}/>}
-          {coachEnabled&&<p className="support-status" aria-live="polite">{locale==='zh-CN'?t("AI 支持"):t("AI support")}{t(":")}{adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(locale==='zh-CN'?'可以尝试更具体的提示':'A stronger hint is available'):(locale==='zh-CN'?'可以尝试更独立地思考':'Ready to try more independently')):(locale==='zh-CN'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
+          {coachEnabled&&<p className="support-status" aria-live="polite">{locale==='zh-CN'?t("AI 支持"):t("AI support")}{t(":")}{adaptive.showRecommendation?(adaptive.decision.reason==='stronger'?(locale==='zh-CN'?'可以尝试更强的拆解支持':'Step-by-step guidance is available'):(locale==='zh-CN'?'可以尝试更独立地思考':'Ready to try more independently')):(locale==='zh-CN'?'按你选择的等级引导':'Guidance at your chosen level')}</p>}
           {!finished&&coachEnabled&&(adaptive.decision.challengeEligible||!!challenges[active]?.claim)&&<AIChallenge initial={challenges[active]} onSave={value=>setChallenges(prev=>({...prev,[active]:value}))} generateResponse={research.generate} language={locale==='zh-CN'?'zh':'en'} onTrigger={(claim)=>{const id=crypto.randomUUID();challengeRef.current={id,stage:active};research.event('AI_CHALLENGE_STARTED',{challengeId:id,aiChallengeTriggered:true,messageText:claim});}} onChoice={(choice:Choice)=>research.event('AI_CHALLENGE_RESPONSE',{challengeId:challengeRef.current?.id,learnerChoice:choice})} onRevision={revision=>research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current?.id,laterRevision:revision})} disabled={(pending.length>0||research.busy)} key={`${active}:${config.enableAIChallenge}`} request={adaptiveRequest} onRespond={(message,claim)=>void send(message,claim)}/>}
 
         </aside>

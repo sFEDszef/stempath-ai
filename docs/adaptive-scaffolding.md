@@ -1,5 +1,8 @@
 # STEMPath AI v0.5.1 — Adaptive Scaffolding Engine
 
+Support ladder update: the historical level/prompt descriptions below are superseded by [support policy v2](support-policy-v2.md), with default Level 2, new Level 3 rescue scaffolds and young-learner-v4. Existing research archives retain their original v1 semantics.
+
+
 ## Control pipeline
 
 Student turn and current-stage records → deterministic signals → learner indicators → teaching decision → Demo or DeepSeek language generation. `src/lib/pedagogy/decisionEngine.ts` is shared by the UI and server. The server recomputes the decision from validated task-local history rather than accepting client instructions. The model must follow the selected level and engine strategy. `/api/chat`, normal Next.js builds, dynamic tasks and credential-free Demo remain intact.

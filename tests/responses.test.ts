@@ -7,13 +7,13 @@ afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs()});
 it('sends current task, records and history only to DeepSeek',async()=>{
  vi.stubEnv('DEEPSEEK_API_KEY','test-placeholder-not-a-real-key');
  vi.stubEnv('AI_MODEL','deepseek-flash');vi.stubEnv('DEEPSEEK_BASE_URL','https://api.deepseek.com');
- const fetch=vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:'Repeated measurements can reveal variation. What evidence would help you decide?'}}]}));
+ const fetch=vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:'Compare actual evidence: trial A ___; trial B ___. Which recorded evidence would you compare first?'}}]}));
  vi.stubGlobal('fetch',fetch);
  const task=demoTasks[4];const artifacts={test:{Observations:'Growth measurements varied across repeated observations.'}};
  expect((await deepseekProvider({task,artifacts,completed:['understand'],stage:'test',level:2,message:'How can I check this?',history:[{role:'student',text:'I measured growth.'}]})).text).toContain('evidence');
  const call=fetch.mock.calls[0] as unknown as [unknown,RequestInit];
  const body=JSON.parse(call[1].body as string);
- expect(body.model).toBe('deepseek-flash');expect(body.messages[0].content).toContain('Directional hints');expect(body.messages[0].content).toContain('untrusted learning data');
+ expect(body.model).toBe('deepseek-flash');expect(body.messages[0].content).toContain('Partial scaffolding');expect(body.messages[0].content).toContain('untrusted learning data');
  const data=JSON.parse(body.messages[1].content);
  expect(data.task.title).toBe(task.title);expect(data.artifacts).toEqual(artifacts);expect(data.history[0].text).toBe('I measured growth.');expect(data.latestStudentMessage).toBe('How can I check this?');expect(JSON.stringify(body)).not.toMatch(/Wind-Powered|sail/);
 });

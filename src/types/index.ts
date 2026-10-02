@@ -88,7 +88,7 @@ export interface StagePedagogy {
 
 export interface CoachMetadata {
  provider:'deepseek'|'demo';model:string;responseMode:'ai'|'demo';
- STEMPathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3';
+ STEMPathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4';supportPolicyVersion?:import('@/lib/stem/supportLevels').SupportPolicyVersion;
  providerAttempted?:boolean;diagnostic?:string;compliance?:'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_FALLBACK_DEMO';
  tokenUsage?:{inputTokens:number;outputTokens:number;totalTokens:number};
  fallbackReason?:string;

@@ -7,6 +7,7 @@ import {measures,participantPattern} from './traceability';
 import type { STEMTask,StageId,SupportLevel,ChatRequest } from '@/types';
 import { parseResearchConfig, conditionConfig, type ResearchConfig } from './config';
 import { endSession,changeTask,changeSupport,enterStage,finishSession,recordEvent,reviseArtifact,setTextStorage,startSession,completeStage,type ResearchSession,type EventType,type EventData,type Initiator } from './session';
+import {SUPPORT_POLICY_VERSION,supportPolicyVersion} from '@/lib/stem/supportLevels';
 import { readSavedSession, STORAGE_PREFIX } from './storage';
 interface Persistence {server?:boolean;onSave?:(s:ResearchSession)=>Promise<void>;}
 export function useResearchSession(options:Persistence={}){
@@ -22,7 +23,7 @@ export function useResearchSession(options:Persistence={}){
   try{localStorage.setItem(STORAGE_PREFIX+next.sessionId,JSON.stringify(next));setSavedCount(Object.keys(localStorage).filter(k=>k.startsWith(STORAGE_PREFIX)).length);setStorageNotice('');}
   catch{setStorageNotice('Local storage is unavailable or full. Export before closing this tab; the current session is still in memory.');}
  },[flush]);
- const restore=useCallback((s:ResearchSession)=>{const now=Date.now();const next=s.completedAt?s:recordEvent({...s,endedAt:undefined,endReason:undefined,activity:{...s.activity,lastTick:now,lastActivity:now,visible:true,idle:false}},'WORKSPACE_RESTORED');save(next);},[save]);
+ const restore=useCallback((s:ResearchSession)=>{if(supportPolicyVersion(s.supportPolicyVersion)!==SUPPORT_POLICY_VERSION)throw Error('Start a new research session for the current support policy.');const now=Date.now();const next=s.completedAt?s:recordEvent({...s,endedAt:undefined,endReason:undefined,activity:{...s.activity,lastTick:now,lastActivity:now,visible:true,idle:false}},'WORKSPACE_RESTORED');save(next);},[save]);
  useEffect(()=>{window.addEventListener('pagehide',flush);return()=>{flush();window.removeEventListener('pagehide',flush);};},[flush]);
  const update=useCallback((fn:(s:ResearchSession)=>ResearchSession)=>{if(current.current)save(fn(current.current));},[save]);
  const start=useCallback((task:STEMTask,config=conditionConfig(),context?:StartContext)=>{save(startSession(task,config,Date.now(),context));},[save]);

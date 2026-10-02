@@ -55,6 +55,19 @@ describe('normalized project persistence and isolation',()=>{
  it('rejects forged assigned task content',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('ADAPTIVE_SUPPORT'));await expect(projects.create(a,{...demoTasks[0],description:'Other task'},'ASSIGNED')).rejects.toMatchObject({status:400});});
  it('NO_AI assignments reject assistant conversations and AI Challenge state',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('NO_AI'));const p=await projects.create(a,demoTasks[0],'ASSIGNED');p.conversations.understand=[{id:'a',role:'assistant',text:'An AI response'}];await expect(projects.save(a,p.id,p,1)).rejects.toMatchObject({status:400});});
 });
+describe('server support policy migration',()=>{
+ it('creates new server projects at Level 2 and records v2',async()=>{
+  const p=await projects.create(a,demoTasks[0],'OPEN');expect(p).toMatchObject({level:2,supportPolicyVersion:'v2',serverVersion:1});
+  const [row]=await db.query('SELECT support_policy_version FROM projects WHERE id=$1',[p.id]);expect(row.support_policy_version).toBe('v2');
+ });
+ it.each([[1,1],[2,1],[3,2]] as const)('atomically maps server legacy Level %s to %s once',(async(old,next)=>{
+  const p=await projects.create(a,demoTasks[0],'OPEN');p.notebook='Keep my notebook';await projects.save(a,p.id,p,1);
+  await db.query("UPDATE projects SET support_level=$2,support_policy_version='v1' WHERE id=$1",[p.id,old]);
+  const migrated=await projects.get(a,p.id);expect(migrated).toMatchObject({level:next,supportPolicyVersion:'v2',notebook:p.notebook,serverVersion:3});
+  expect(await projects.get(a,p.id)).toEqual(migrated);
+  await expect(projects.save(a,p.id,p,2)).rejects.toMatchObject({status:409});
+ }));
+});
 describe('research linkage, privacy and deliberate deletion',()=>{
  it('links research to the authenticated user and owned project, excludes PIN/security and raw text when OFF',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN'),research=new ResearchStore(db);let s=startSession(p.task,p.researchConfig);s=recordEvent(s,'MESSAGE_SENT',{messageText:'Private learner phrase'});await research.save(a,p.id,{...s,participantCode:'FORGED',pinHash:'secret',authSession:'secret'},0);const [r]=await db.query('SELECT user_id,project_id FROM research_sessions');expect(r.user_id).toBe(a.id);expect(r.project_id).toBe(p.id);const output=await research.export(admin,a.id);expect(output).toContain('P001');for(const secret of ['Private learner phrase','FORGED','pinHash','authSession'])expect(output).not.toContain(secret);await expect(research.latest(b,p.id)).rejects.toMatchObject({status:404});await expect(research.save(b,p.id,s,0)).rejects.toMatchObject({status:404});});
  it('captures opted-in text only under the server assignment policy',async()=>{const config={...conditionConfig(),storeMessageText:true};await projects.assign(admin,a.id,demoTasks[0],config);const p=await projects.create(a,demoTasks[0],'ASSIGNED'),store=new ResearchStore(db);const s=recordEvent(startSession(p.task,config),'MESSAGE_SENT',{messageText:'Opted-in text'});await store.save(a,p.id,s,0);expect(await store.export(admin,a.id)).toContain('Opted-in text');});

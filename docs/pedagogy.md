@@ -1,4 +1,6 @@
-# STEMPath AI v0.3 pedagogical scaffolding matrix
+# STEMPath AI pedagogical scaffolding matrix — support policy v2
+
+Current policy: [v2 support ladder, migration and research versioning](support-policy-v2.md). New sessions use young-learner-v4. Numeric levels 1/2/3 are preserved.
 
 The executable matrix is `src/lib/stem/stages.ts` (`pedagogy`). Every entry includes objective, student responsibility, coach role, prohibited shortcuts, three support examples, questions, record fields and suggested replies. Task content is intentionally absent from the matrix.
 
@@ -12,17 +14,17 @@ The executable matrix is `src/lib/stem/stages.ts` (`pedagogy`). Every entry incl
 | Improve / Refine / Revise | Justify a revision with evidence | Connect observations to a controlled next comparison | Prescribing changes without evidence |
 | Reflect | Explain STEM learning and evaluate AI collaboration | Ask which advice was accepted, rejected and checked | Writing the learner's reflection or rewarding agreement |
 
-| Stage | Level 1: questions | Level 2: directional hint | Level 3: partial scaffold |
+| Stage | Level 1: clue + question | Level 2: partial scaffold + decision | Level 3: micro-steps + first decision |
 |---|---|---|---|
-| Understand | What counts as success? | Separate goal and constraints; which comes first? | Goal ___; constraints ___; success evidence ___ |
-| Imagine | What are two possibilities? | Change an assumption; how does the idea change? | Idea A/B: benefit ___; uncertainty ___; evidence ___ |
-| Plan | What evidence do you need? | Change one relevant factor; which would you choose? | Change ___; keep ___; measure ___; repeat ___ |
-| Build | What did you try and observe? | Compare expected and actual behavior | Step ___; expected ___; observed ___; safe check ___ |
-| Test | What did you measure? | Compare variation across trials | Trial / conditions / measurement / observation |
-| Improve | Which observation suggests a change? | Link one factor to the evidence | Evidence ___; change ___; prediction ___; comparison ___ |
-| Reflect | What changed your thinking? | Compare independent and AI-influenced decisions | Before ___; evidence ___; AI advice accepted/rejected ___; next ___ |
+| Understand | Look for task actions and success information | My goal ___; success means ___ | Find goal → find success information → choose a check; do only the first missing step |
+| Imagine | Changing an assumption opens another possibility | Idea A ___; idea B ___ | Name one idea → notice a difference → choose one; start with one idea |
+| Plan | Keep relevant conditions the same for comparison | Change ___; keep ___; measure ___ | Choose one change → keep a condition the same → choose measurement; decide the first change only |
+| Build | Compare expected and actual behavior | I tried ___; I saw ___ | Recall a step → describe what happened → choose a safe check; recall the step first |
+| Test | Results are actual observations or measurements | Trial ___; result ___; units ___ | Find a real record → compare with goal → decide another check; use one real record first |
+| Improve | Link one change to a real observation | I saw ___; I want to change ___ | Find observation → choose change → check effect; find the observation first |
+| Reflect | Connect an experience to a changed idea | I used to think ___; after trying ___ | Recall an experience → find changed idea → connect them; recall the experience first |
 
-Support is always learner controlled. Fading is a transparent prototype heuristic: at least two student turns and two current-stage records of at least 20 characters allow one invitation per stage per page session when support is above Level 1. It does not evaluate correctness, diagnose mastery, or automatically lower assistance.
+Normal support starts at Level 2. Learners control any change. Two repeated difficulty signals can offer escalation; two recent productive turns with reasoning/evidence can offer fading one level. No level changes automatically, no checkpoint is filled by the coach, and no heuristic diagnoses mastery. Confusion is rephrased with increasingly concrete help rather than the same question repeated. Even Level 3 cannot generate the final solution, complete experimental design, data, conclusion or reflection.
 
 AI Challenge is opt-in in Imagine, Plan, Test and Improve. A model-generated claim (or explicitly labelled deterministic demo claim) invites Agree / Disagree / Need evidence. Claims are visibly unverified. Follow-up coaching asks how to test them and does not reveal a verdict. No correctness score or hidden assessment is produced.
 

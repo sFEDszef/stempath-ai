@@ -1,0 +1,1 @@
+ALTER TABLE "projects" ADD COLUMN "support_policy_version" varchar(8) DEFAULT 'v1' NOT NULL;

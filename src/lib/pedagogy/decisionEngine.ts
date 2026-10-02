@@ -1,3 +1,4 @@
+import {SUPPORT_POLICY_VERSION} from '@/lib/stem/supportLevels';
 import { conditionConfig } from '@/lib/research/config';
 import type { ChatRequest, StageId, SupportLevel, STEMTask, LearningArtifacts } from '@/types';
 import { checkpointState } from '@/lib/stem/stageCheckpoints';
@@ -10,7 +11,7 @@ export interface LearnerState {
  meaningfulArtifacts:number; fadingRecommended:boolean; strongerSupportRecommended:boolean; aiChallengeEligible:boolean;
  language:Language; signals:Signals; focus:'goal'|'condition'|'evidence'|'reasoning';
 }
-export type Action='STATIC_STAGE_PROMPT'|'ASK_SOCRATIC_QUESTION'|'GIVE_DIRECTIONAL_HINT'|'PROVIDE_STRUCTURED_SUPPORT'|'REQUEST_EVIDENCE'|'PROMPT_REFLECTION'|'RETURN_AGENCY'|'TRIGGER_AI_CHALLENGE';
+export type Action='STATIC_STAGE_PROMPT'|'GIVE_DIRECTIONAL_HINT'|'PROVIDE_STRUCTURED_SUPPORT'|'PROVIDE_STEP_BY_STEP_SUPPORT'|'REQUEST_EVIDENCE'|'PROMPT_REFLECTION'|'RETURN_AGENCY'|'TRIGGER_AI_CHALLENGE';
 export interface Decision {action:Action; recommendation?:SupportLevel; reason?:'stronger'|'fade'; challengeEligible:boolean; state:LearnerState}
 export function artifactProgress(task:STEMTask,stage:StageId,records:LearningArtifacts) {
  const fields=artifactFields(task,stage);
@@ -46,7 +47,7 @@ export function decidePedagogicalAction(request:ChatRequest):Decision {
  state.strongerSupportRecommended=state.strongerSupportRecommended&&adaptive&&config.enableEscalation&&!noAI;
  state.fadingRecommended=state.fadingRecommended&&adaptive&&config.enableFading&&!noAI;
  state.aiChallengeEligible=state.aiChallengeEligible&&config.enableAIChallenge&&!noAI;
- const action:Action=noAI?'STATIC_STAGE_PROMPT':request.intent==='challenge'&&state.aiChallengeEligible?'TRIGGER_AI_CHALLENGE':request.intent==='evaluate-claim'||state.signals.critical?'REQUEST_EVIDENCE':state.consecutiveProductiveResponses>=3&&state.independenceScore>=2/3?'RETURN_AGENCY':request.stage==='reflect'?'PROMPT_REFLECTION':request.level===1?'ASK_SOCRATIC_QUESTION':request.level===2?'GIVE_DIRECTIONAL_HINT':'PROVIDE_STRUCTURED_SUPPORT';
+ const action:Action=noAI?'STATIC_STAGE_PROMPT':request.intent==='challenge'&&state.aiChallengeEligible?'TRIGGER_AI_CHALLENGE':request.intent==='evaluate-claim'||state.signals.critical?'REQUEST_EVIDENCE':state.consecutiveProductiveResponses>=3&&state.independenceScore>=2/3?'RETURN_AGENCY':request.stage==='reflect'?'PROMPT_REFLECTION':request.level===1?'GIVE_DIRECTIONAL_HINT':request.level===2?'PROVIDE_STRUCTURED_SUPPORT':'PROVIDE_STEP_BY_STEP_SUPPORT';
  return {state,action,recommendation:state.strongerSupportRecommended?(request.level+1) as SupportLevel:state.fadingRecommended?(request.level-1) as SupportLevel:undefined,reason:state.strongerSupportRecommended?'stronger':state.fadingRecommended?'fade':undefined,challengeEligible:state.aiChallengeEligible};
 }
 
@@ -55,5 +56,5 @@ export function applySupportChoice(current:SupportLevel,recommended:SupportLevel
 /** Only engine-owned values enter provider instructions; raw task IDs stay in user data. */
 export function providerStrategy(request:ChatRequest) {
  const d=decidePedagogicalAction(request);
- return {interfaceLanguage:request.interfaceLanguage,taskLanguage:request.taskLanguage,...(request.previousLevel===undefined?{}:{previousSupportLevel:request.previousLevel}),action:d.action,stage:request.stage,supportLevel:request.level,condition:(request.research??conditionConfig()).condition,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
+ return {supportPolicyVersion:SUPPORT_POLICY_VERSION,interfaceLanguage:request.interfaceLanguage,taskLanguage:request.taskLanguage,...(request.previousLevel===undefined?{}:{previousSupportLevel:request.previousLevel}),action:d.action,stage:request.stage,supportLevel:request.level,condition:(request.research??conditionConfig()).condition,language:d.state.language,focus:d.state.focus,consecutiveUncertainty:d.state.consecutiveUncertaintySignals,productiveResponses:d.state.consecutiveProductiveResponses,meaningfulArtifacts:d.state.meaningfulArtifacts};
 }

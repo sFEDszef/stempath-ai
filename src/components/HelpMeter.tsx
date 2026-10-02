@@ -43,10 +43,10 @@ export function HelpMeter({
       <strong className="support-description">{t(supportLabels[level])}</strong>
       <p>
         {level === 1
-          ? t("Good questions help great ideas grow.")
+          ? t("A small clue, then one decision of your own.")
           : level === 2
-            ? t("A small hint to help you find your next step.")
-            : t("A thinking framework to help you move forward.")}
+            ? t("A partial frame to help you break down the next step.")
+            : t("Small steps, with one choice at a time.")}
       </p>
     </section>
   );
