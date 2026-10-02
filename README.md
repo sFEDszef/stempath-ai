@@ -65,7 +65,7 @@ This validates and dispatches a local event consumed by the mounted TaskWorkspac
 ## Shared architecture
 
 - `src/lib/stem/stages.ts`: full seven-stage pedagogical matrix, adaptive labels, key questions, artifact fields and stage suggestions.
-- `src/lib/stem/supportLevels.ts`: Level 1 questions, Level 2 directional hints, Level 3 partial scaffolds.
+- `src/lib/stem/supportLevels.ts`: Level 1 concrete hints, Level 2 structured partial scaffolds, Level 3 step-by-step rescue support.
 - `src/lib/stem/prompts.ts`: trusted teaching rules, stage and support composition; treats every task field, claim and record as untrusted data.
 - `src/lib/stem/validation.ts`: bounded server request and record validation.
 - `src/lib/stem/handler.ts`: validated same-origin API boundary; `src/lib/ai/` owns DeepSeek Chat Completions, safe errors and explicit Demo fallback.
@@ -105,7 +105,7 @@ Open `/?research=1` for condition assignment, seeded tasks, local session traces
 
 Optional support recommendations appear beside the chat input. Adaptive support offers escalation after two consecutive uncertainty/help signals. At Level 2 or 3, two consecutive productive responses, including recent reasoning, evidence or critical evaluation, can offer fading. Accepting a recommendation or manually changing support immediately requests guidance at the chosen level; no level changes automatically.
 
-Level 1 uses one Socratic question, Level 2 adds a directional hint, and Level 3 uses task-informed choices or partial frames. LOW disables proactive recommendations; HIGH starts at Level 3; NO_AI remains unchanged. These are prototype heuristics, not validated measures of learning.
+Under support policy v2, Level 1 provides a concrete clue and one manageable question; Level 2 adds a partial frame or choices; Level 3 provides a brief explanation and two or three thinking steps before one learner decision. LOW starts at Level 1 and disables proactive recommendations; ADAPTIVE and CUSTOM normally start at Level 2; HIGH starts at Level 3; NO_AI disables coaching. These are prototype heuristics, not validated measures of learning.
 
 ## DeepSeek pilot
 
