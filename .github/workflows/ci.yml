@@ -38,12 +38,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - name: Apply explicit migrations
+        env:
+          DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
+        run: pnpm db:migrate
       - run: pnpm test
       - run: pnpm build
       - name: Build ECS application and migration images
         run: |
           docker build --target runner -t stempath-app:ci .
           docker build --target tooling -t stempath-tooling:ci .
+          docker run --rm --network host -e DATABASE_URL="$TEST_DATABASE_URL" stempath-tooling:ci
       - name: Validate Compose with disposable placeholders
         env:
           POSTGRES_PASSWORD: isolated_ci_only
