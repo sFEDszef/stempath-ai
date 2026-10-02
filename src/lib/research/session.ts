@@ -1,3 +1,4 @@
+import {READINESS_POLICY_VERSION} from '@/lib/stem/readiness';
 import {SUPPORT_POLICY_VERSION,PROMPT_VERSION,type SupportPolicyVersion} from '@/lib/stem/supportLevels';
 import {initialSnapshot,taskTrace,tick,durations,type ConfigSnapshot,type ActivityClock,type StartContext} from './reliability';
 import {targetGradeBand} from '@/lib/stem/gradeBands';
@@ -9,7 +10,7 @@ export type Initiator='STUDENT'|'SYSTEM_RECOMMENDATION'|'RESEARCH_CONDITION';
 export type EventType='STAGE_READY'|'STAGE_OVERRIDE'|'CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
 export type Choice='AGREE'|'DISAGREE'|'NEED_EVIDENCE';
 export interface EventData {
- diagnostic?:string;reasonCategory?:string;
+ diagnostic?:string;reasonCategory?:string;readinessSource?:import('@/lib/stem/readiness').StageReadinessAssessment['source'];ready?:boolean;
  coach?:CoachMetadata;
  settings?:ResearchConfig;learnerSignal?:string[];pedagogicalDecision?:string;supportRecommendation?:SupportLevel;
  initiator?:Initiator;studentAction?:string;systemAction?:string;messageText?:string;
@@ -25,9 +26,9 @@ export interface SupportChange {timestamp:string;taskId:string;stage:StageId;fro
 export interface ArtifactRevision {taskId:string;stage:StageId;artifactType:string;version:number;timestamp:string;characterCount:number;text?:string}
 export interface ResearchSession {
  interfaceLanguage?:"zh-CN"|"en";taskLanguage?:"zh-CN"|"en";
- schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4';supportPolicyVersion?:SupportPolicyVersion;provider:string;model:string;taskDefinitionVersion:number;
+ schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4'|'young-learner-v5';readinessPolicyVersion?:'gentle-v1';supportPolicyVersion?:SupportPolicyVersion;provider:string;model:string;taskDefinitionVersion:number;
  participantCode?:string;baselineMeasures:Record<string,number>;outcomeMeasures:Record<string,number>;configSnapshot:ConfigSnapshot;activity:ActivityClock;elapsedDurationMs:number;activeDurationMs:number;usage:{aiCalls:number;inputTokens:number;outputTokens:number;totalTokens:number};
- sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE';condition:Condition;config:ResearchConfig;
+ sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE';condition:Condition;config:ResearchConfig;
  language:'en'|'zh';currentStage:StageId;supportLevel:SupportLevel;taskId:string;completedStages:StageId[];
  interactionCount:number;events:InteractionEvent[];tasks:TaskRun[];stageTimings:StageTiming[];
  supportHistory:SupportChange[];artifactRevisions:ArtifactRevision[];droppedEvents:number;
@@ -42,6 +43,7 @@ function metadata(task:STEMTask,config:ResearchConfig,now:number):TaskRun {
 }
 export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData={},now=Date.now(),stage=s.currentStage,level=s.supportLevel):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
+ if(eventType==='STAGE_READY'&&s.events.some(e=>e.eventType==='STAGE_READY'&&e.taskId===s.taskId&&e.stage===stage))return s;
  const {messageText,...meta}=data;
  const event:InteractionEvent={...meta,eventId:uuid(),sessionId:s.sessionId,timestamp:stamp(now),taskId:s.taskId,stage,condition:s.condition,supportLevel:level,eventType,...(s.config.storeMessageText&&messageText!==undefined?{messageText:messageText.slice(0,4000)}:{})};
  const events=[...s.events,event];
@@ -49,7 +51,7 @@ export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData
 }
 export function startSession(task:STEMTask,config:ResearchConfig,now=Date.now(),context:StartContext={interfaceLanguage:'en',taskLanguage:'en',provider:'auto',model:'pending'}):ResearchSession {
  const run=metadata(task,config,now),level=initialLevel(config.condition,config.initialSupportLevel);
- return recordEvent({schemaVersion:'0.6',stempathVersion:'0.7',promptVersion:PROMPT_VERSION,supportPolicyVersion:SUPPORT_POLICY_VERSION,provider:context.provider,model:context.model,taskDefinitionVersion:task.taskRevision??1,interfaceLanguage:context.interfaceLanguage,taskLanguage:context.taskLanguage,baselineMeasures:{},outcomeMeasures:{},configSnapshot:{...initialSnapshot(task,config,now,context),taskDefinitionId:run.taskDefinitionId},activity:{lastTick:now,lastActivity:now,activeDurationMs:0,visible:true,idle:false},elapsedDurationMs:0,activeDurationMs:0,usage:{aiCalls:0,inputTokens:0,outputTokens:0,totalTokens:0},sessionId:uuid(),startedAt:stamp(now),updatedAt:stamp(now),condition:config.condition,config:{...config},language:'en',currentStage:'understand',supportLevel:level,taskId:run.taskId,completedStages:[],interactionCount:0,events:[],tasks:[run],stageTimings:[{taskId:run.taskId,stage:'understand',stageEnteredAt:stamp(now),durationMs:0}],supportHistory:[{timestamp:stamp(now),taskId:run.taskId,stage:'understand',to:level,initiator:'RESEARCH_CONDITION'}],artifactRevisions:[],droppedEvents:0},'SESSION_STARTED',{settings:{...config}},now);
+ return recordEvent({schemaVersion:'0.6',stempathVersion:'0.7',promptVersion:PROMPT_VERSION,supportPolicyVersion:SUPPORT_POLICY_VERSION,readinessPolicyVersion:READINESS_POLICY_VERSION,provider:context.provider,model:context.model,taskDefinitionVersion:task.taskRevision??1,interfaceLanguage:context.interfaceLanguage,taskLanguage:context.taskLanguage,baselineMeasures:{},outcomeMeasures:{},configSnapshot:{...initialSnapshot(task,config,now,context),taskDefinitionId:run.taskDefinitionId},activity:{lastTick:now,lastActivity:now,activeDurationMs:0,visible:true,idle:false},elapsedDurationMs:0,activeDurationMs:0,usage:{aiCalls:0,inputTokens:0,outputTokens:0,totalTokens:0},sessionId:uuid(),startedAt:stamp(now),updatedAt:stamp(now),condition:config.condition,config:{...config},language:'en',currentStage:'understand',supportLevel:level,taskId:run.taskId,completedStages:[],interactionCount:0,events:[],tasks:[run],stageTimings:[{taskId:run.taskId,stage:'understand',stageEnteredAt:stamp(now),durationMs:0}],supportHistory:[{timestamp:stamp(now),taskId:run.taskId,stage:'understand',to:level,initiator:'RESEARCH_CONDITION'}],artifactRevisions:[],droppedEvents:0},'SESSION_STARTED',{settings:{...config}},now);
 }
 function closeStage(s:ResearchSession,now:number):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
@@ -73,6 +75,7 @@ export function changeSupport(s:ResearchSession,to:SupportLevel,initiator:Initia
  return recordEvent({...s,supportLevel:to,supportHistory:[...s.supportHistory,{timestamp:stamp(now),taskId:s.taskId,stage:s.currentStage,from:s.supportLevel,to,initiator}]},'SUPPORT_CHANGED',{initiator},now);
 }
 export function completeStage(s:ResearchSession,stage:StageId,complete=true,now=Date.now()):ResearchSession {
+ if(s.completedStages.includes(stage)===complete)return s;
  const completedStages=complete?[...new Set([...s.completedStages,stage])]:s.completedStages.filter(id=>id!==stage);
  return recordEvent({...s,completedStages,tasks:s.tasks.map(t=>t.taskId===s.taskId?{...t,completedStages}:t)},complete?'STAGE_COMPLETED':'STAGE_REOPENED',{stageCompleted:complete},now,stage);
 }
@@ -100,7 +103,7 @@ export function snapshot(s:ResearchSession,now=Date.now()):ResearchSession {
 }
 export function sessionSummary(s:ResearchSession){return {stages:s.completedStages.length,revisions:s.artifactRevisions.filter(r=>r.taskId===s.taskId&&r.version>1).length,evidence:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='MESSAGE_SENT'&&e.learnerSignal?.includes('evidence')).length,challenges:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='AI_CHALLENGE_RESPONSE').length,supportChanges:s.supportHistory.filter(h=>h.taskId===s.taskId&&h.from!==undefined).length};}
 
-export function endSession(s:ResearchSession,reason:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE',now=Date.now()):ResearchSession {
+export function endSession(s:ResearchSession,reason:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE',now=Date.now()):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
  if(s.completedAt||s.endedAt)return s;
  return recordEvent({...closeStage(s,now),endedAt:stamp(now),endReason:reason},'SESSION_ENDED',{systemAction:reason},now);

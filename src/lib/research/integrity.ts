@@ -1,3 +1,4 @@
+import {readinessCriteria} from '@/lib/stem/readiness';
 import {supportPolicyVersion,PROMPT_VERSION} from '@/lib/stem/supportLevels';
 import {conditions,parseResearchConfig} from './config';
 import {stageIds} from '@/lib/stem/stages';
@@ -26,13 +27,15 @@ export function validateSession(value:unknown):IntegrityReport {
   const initial=s.configSnapshot;
   const policy=supportPolicyVersion(s.supportPolicyVersion);
   require(supportPolicyVersion(initial.supportPolicyVersion)===policy,'Mixed initial support policy');
-  require((s.promptVersion===PROMPT_VERSION)===(policy==='v2'),'Prompt/support policy mismatch');
+  require(['young-learner-v4',PROMPT_VERSION].includes(s.promptVersion)===(policy==='v2'),'Prompt/support policy mismatch');
+  require(s.readinessPolicyVersion===initial.readinessPolicyVersion,'Mixed initial readiness policy');
+  require((s.promptVersion===PROMPT_VERSION)===(s.readinessPolicyVersion==='gentle-v1'),'Prompt/readiness policy mismatch');
   require(!!initial&&date(initial.timestamp)&&initial.condition===s.condition&&!!initial.provider&&!!initial.model&&initial.promptVersion===s.promptVersion,'Invalid initial configuration');
   require(['en','zh-CN'].includes(initial.interfaceLanguage)&&['en','zh-CN'].includes(initial.taskLanguage),'Invalid initial languages');
   require(['fadingEnabled','escalationEnabled','AIChallengeEnabled','manualSupportChange','messageTextStorage'].every(k=>typeof initial[k as keyof typeof initial]==='boolean'),'Invalid initial policy');
   require(['maxAICallsPerSession','maxTokensPerSession','idleThresholdMs'].every(k=>Number.isSafeInteger(initial[k as keyof typeof initial])&&Number(initial[k as keyof typeof initial])>0),'Invalid initial limits');
   if(initial.provider==='auto'||initial.model==='pending')warnings.push('Initial provider availability was unresolved; use per-response metadata.');
-  require(typeof s.provider==='string'&&s.provider.length>0&&typeof s.model==='string'&&s.model.length>0&&['deepseek-v2','young-learner-v3',PROMPT_VERSION].includes(s.promptVersion),'Missing provider metadata');
+  require(typeof s.provider==='string'&&s.provider.length>0&&typeof s.model==='string'&&s.model.length>0&&['deepseek-v2','young-learner-v3','young-learner-v4',PROMPT_VERSION].includes(s.promptVersion),'Missing provider metadata');
   require(Array.isArray(s.tasks)&&s.tasks.length>0&&s.tasks.length<=200,'Missing/oversized task runs');
   const runs=new Map(s.tasks.map(t=>[t.taskId,t]));require(runs.size===s.tasks.length&&runs.has(s.taskId),'Duplicate or missing task run');
   for(const t of s.tasks){require(t.taskId===t.taskRunId&&typeof t.taskDefinitionId==='string'&&!!t.taskDefinitionId&&Number.isSafeInteger(t.taskRevision)&&t.taskRevision>0&&typeof t.taskSnapshotHash==='string'&&/^fnv-[a-f0-9]+-[a-f0-9]+$/.test(t.taskSnapshotHash),'Invalid task trace');require(date(t.startedAt)&&t.completedStages.every(v=>stageIds.includes(v)),'Invalid task metadata');}
@@ -40,9 +43,10 @@ export function validateSession(value:unknown):IntegrityReport {
   require(Array.isArray(s.events)&&s.events.length<=5000,'Invalid event collection');
   let previous=Date.parse(s.startedAt);const ids=new Set<string>(),claims=new Map<string,string>();
   for(const e of s.events){require(e.sessionId===s.sessionId&&runs.has(e.taskId)&&!ids.has(e.eventId)&&typeof e.eventId==='string','Cross-session/task or duplicate event');ids.add(e.eventId);require(date(e.timestamp)&&Date.parse(e.timestamp)>=previous,'Events not ordered');previous=Date.parse(e.timestamp);require(e.condition===s.condition&&stageIds.includes(e.stage)&&[1,2,3].includes(e.supportLevel),'Invalid event policy');
+   if(e.eventType==='STAGE_READY'&&e.systemAction==='SEMANTIC_MINIMUM_EVIDENCE')require(e.ready===true&&e.reasonCategory===readinessCriteria[e.stage]&&['AI_SEMANTIC','LOCAL_RECORD','DEMO'].includes(e.readinessSource??''),'Invalid readiness event');
    if(e.eventType==='AI_CHALLENGE_STARTED'){require(!!e.challengeId&&!claims.has(e.challengeId),'Invalid challenge start');claims.set(e.challengeId!,e.taskId+e.stage);}
    if(['AI_CHALLENGE_RESPONSE','AI_CHALLENGE_FOLLOW_UP'].includes(e.eventType))require(!!e.challengeId&&claims.get(e.challengeId)===e.taskId+e.stage,'Unlinked challenge event');
-   if(e.coach){require(supportPolicyVersion(e.coach.supportPolicyVersion)===policy,'Mixed response support policy');require(['demo','deepseek'].includes(e.coach.provider)&&typeof e.coach.model==='string'&&e.coach.model.length>0&&['0.6','0.6.2','0.7'].includes(e.coach.STEMPathVersion)&&e.coach.promptVersion===s.promptVersion,'Invalid response metadata');require(e.coach.responseMode===(e.coach.provider==='demo'?'demo':'ai'),'Provider/mode mismatch');const u=e.coach.tokenUsage;if(u)require(Object.values(u).every(nonnegative)&&u.totalTokens===u.inputTokens+u.outputTokens,'Invalid response token usage');}
+   if(e.coach){require(e.coach.readinessPolicyVersion===s.readinessPolicyVersion,'Mixed response readiness policy');require(supportPolicyVersion(e.coach.supportPolicyVersion)===policy,'Mixed response support policy');require(['demo','deepseek'].includes(e.coach.provider)&&typeof e.coach.model==='string'&&e.coach.model.length>0&&['0.6','0.6.2','0.7'].includes(e.coach.STEMPathVersion)&&e.coach.promptVersion===s.promptVersion,'Invalid response metadata');require(e.coach.responseMode===(e.coach.provider==='demo'?'demo':'ai'),'Provider/mode mismatch');const u=e.coach.tokenUsage;if(u)require(Object.values(u).every(nonnegative)&&u.totalTokens===u.inputTokens+u.outputTokens,'Invalid response token usage');}
    if(!s.config.storeMessageText)require(e.messageText===undefined,'Text present with capture OFF');
   }
   for(const list of [s.supportHistory,s.artifactRevisions,s.stageTimings])require(Array.isArray(list)&&list.length<=20000,'Invalid history collection');

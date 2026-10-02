@@ -1,4 +1,5 @@
 import type {STEMTask,StageId,LearningArtifacts} from '@/types';
+import {assessLocalReadiness} from './readiness';
 import {stageIds} from './stages';
 import {targetGradeBand} from './gradeBands';
 export interface Checkpoint {field:string;zh:string;en:string;core:boolean;}
@@ -17,7 +18,7 @@ export function stageCheckpoints(task:STEMTask,stage:StageId,aiUsed=true):Checkp
  };return all[stage];
 }
 export function hasCheckpointText(value:string){const s=value.trim();return !/不知道|没懂|不懂|不确定|don['’]?t (?:know|understand)|not sure/i.test(s)&&s.length>=2&&/[\p{L}\p{N}]/u.test(s)&&! /^(?:不知道|不懂|没懂|不确定|好的|嗯+|idk|yes|no|ok|test|I don['’]?t know|not sure)[。.!?？]*$/i.test(s)&&!/^[_?？.。\s]+$/.test(s);}
-export function checkpointState(task:STEMTask,stage:StageId,records:LearningArtifacts,completed:StageId[]=[]){const core=stageCheckpoints(task,stage).filter(c=>c.core);const missing=core.filter(c=>!hasCheckpointText(records[stage]?.[c.field]??''));return {core,missing,count:core.length-missing.length,status:completed.includes(stage)?'COMPLETED':missing.length===0?'READY':core.some(c=>!!records[stage]?.[c.field])?'IN_PROGRESS':'NOT_STARTED'} as const;}
+export function checkpointState(task:STEMTask,stage:StageId,records:LearningArtifacts,completed:StageId[]=[]){const core=stageCheckpoints(task,stage).filter(c=>c.core);const missing=core.filter(c=>!hasCheckpointText(records[stage]?.[c.field]??''));return {core,missing,count:core.length-missing.length,status:completed.includes(stage)?'COMPLETED':assessLocalReadiness(task,stage,records).ready?'READY':core.some(c=>!!records[stage]?.[c.field])?'IN_PROGRESS':'NOT_STARTED'} as const;}
 export function accessibleStage(stage:StageId,active:StageId,completed:StageId[],teacher=false){return teacher||stage===active||completed.includes(stage)||stageIds.slice(0,stageIds.indexOf(stage)).every(s=>completed.includes(s));}
 export function nextStage(stage:StageId){return stageIds[stageIds.indexOf(stage)+1];}
 export const childStageNames:Record<StageId,[string,string]>={understand:['看懂任务','Understand'],imagine:['想办法','Imagine'],plan:['做计划','Plan'],build:['动手试试','Try it'],test:['测一测','Test'],improve:['改一改','Improve'],reflect:['想一想','Reflect']};

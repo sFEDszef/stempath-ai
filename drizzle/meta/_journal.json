@@ -15,6 +15,13 @@
       "when": 1790948170982,
       "tag": "0001_support_policy_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790961534052,
+      "tag": "0002_gentle_readiness",
+      "breakpoints": true
     }
   ]
 }

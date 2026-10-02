@@ -1,4 +1,6 @@
-Current coaching policy: [support policy v2](docs/support-policy-v2.md) — Level 2 is the normal default; Level 3 provides step-by-step rescue support. New research metadata uses young-learner-v4 and an explicit support policy marker.
+Current progression: [gentle readiness](docs/gentle-readiness.md) — one minimum learner contribution can unlock continuation through conversation or notes. The learner still clicks to advance; READY is not mastery.
+
+Current coaching policy: [support policy v2](docs/support-policy-v2.md) — Level 2 is the normal default; Level 3 provides step-by-step rescue support. New research metadata uses young-learner-v5 and an explicit support policy marker.
 
 ## v0.7 — Participant Accounts & Server Persistence
 

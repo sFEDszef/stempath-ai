@@ -1,3 +1,4 @@
+import {READINESS_POLICY_VERSION} from '@/lib/stem/readiness';
 import {SUPPORT_POLICY_VERSION,PROMPT_VERSION} from '@/lib/stem/supportLevels';
 import type { ChatRequest, CoachResponse, CoachMetadata } from '@/types';
 export type CoachProvider = (request:ChatRequest)=>Promise<CoachResponse>;
@@ -5,6 +6,6 @@ export type FailureCode='not_configured'|'configuration'|'authentication'|'balan
 export class ProviderError extends Error {
  constructor(public code:FailureCode,public status=502,public metadata?:CoachMetadata){super(code);this.name='ProviderError';}
 }
-export const release={STEMPathVersion:'0.7',promptVersion:PROMPT_VERSION,supportPolicyVersion:SUPPORT_POLICY_VERSION} as const;
+export const release={STEMPathVersion:'0.7',promptVersion:PROMPT_VERSION,supportPolicyVersion:SUPPORT_POLICY_VERSION,readinessPolicyVersion:READINESS_POLICY_VERSION} as const;
 
 export const diagnostics:Record<FailureCode,string>={not_configured:'NOT_CONFIGURED',configuration:'CONFIGURATION_ERROR',authentication:'AUTH_ERROR',balance:'INSUFFICIENT_BALANCE',rate_limit:'RATE_LIMIT',upstream:'PROVIDER_5XX',network:'NETWORK_ERROR',timeout:'TIMEOUT',invalid_response:'INVALID_RESPONSE',pedagogy:'PEDAGOGICAL_COMPLIANCE_FAILURE'};

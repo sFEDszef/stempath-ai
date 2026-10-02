@@ -91,13 +91,13 @@ describe('support policy v2',()=>{
 describe('research trace isolation',()=>{
  const fresh=()=>startSession(base.task,conditionConfig(),1000,{interfaceLanguage:'en',taskLanguage:'en',provider:'demo',model:'deterministic'});
  it('marks v2 sessions, snapshots, response metadata and every export form',()=>{
-  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v4',supportPolicyVersion:'v2'}},1200);
-  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v4',configSnapshot:{supportPolicyVersion:'v2'}});
+  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v5',readinessPolicyVersion:'gentle-v1',supportPolicyVersion:'v2'}},1200);
+  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v5',readinessPolicyVersion:'gentle-v1',configSnapshot:{supportPolicyVersion:'v2'}});
   for(const output of [exportJSON(s),exportCSV(s),exportBundle([s]),combinedCSV([s])])expect(output).toContain('v2');
   expect(educatorReview(s)[0].supportPolicyVersion).toBe('v2');expect(cleanResearch(s).supportPolicyVersion).toBe('v2');
  });
  it('exports archives lacking a marker explicitly as v1 without changing old numeric history',()=>{
-  const s=fresh();delete s.supportPolicyVersion;delete s.configSnapshot.supportPolicyVersion;s.promptVersion='young-learner-v3';s.configSnapshot.promptVersion='young-learner-v3';s.supportLevel=3;s.supportHistory[0].to=3;
+  const s=fresh();delete s.readinessPolicyVersion;delete s.configSnapshot.readinessPolicyVersion;delete s.supportPolicyVersion;delete s.configSnapshot.supportPolicyVersion;s.promptVersion='young-learner-v3';s.configSnapshot.promptVersion='young-learner-v3';s.supportLevel=3;s.supportHistory[0].to=3;
   const out=JSON.parse(exportJSON(s));expect(out.supportPolicyVersion).toBe('v1');expect(out.configSnapshot.supportPolicyVersion).toBe('v1');expect(out.manifest.supportPolicyVersion).toBe('v1');expect(out.supportLevel).toBe(3);expect(out.supportHistory[0].to).toBe(3);expect(s).not.toHaveProperty('supportPolicyVersion');
   expect(exportBundle([s,fresh()])).toContain('v1');expect(exportBundle([s,fresh()])).toContain('v2');
  });
