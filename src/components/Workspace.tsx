@@ -13,6 +13,8 @@ import { STEMJourney } from "./STEMJourney";
 import { ArtifactUploader } from "./ArtifactUploader";
 import { HelpMeter } from "./HelpMeter";
 import {useI18n} from "@/lib/i18n";
+import {ReadyTransitionModal} from "./ReadyTransitionModal";
+import {shouldPromptReady} from "@/lib/stem/readyPrompt";
 import {StageCheckpoint} from "./StageCheckpoint";
 import {boundedHistory} from "@/lib/stem/context";
 import {youngReply,youngQuestion} from "@/lib/stem/youngLearner";
@@ -46,6 +48,8 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const stages=getStages(task).map(s=>({...s,title:primary?(locale==="zh-CN"&&s.id==="build"&&/inquiry|investigation/.test(task.type)?"开始探究":childStageNames[s.id][locale==="zh-CN"?0:1]):locale==="zh-CN"?t(`stage.${s.id}`):s.title,description:primary?({understand:["任务要做什么","Find the goal"],imagine:["想一个办法","Think of an idea"],plan:["准备怎么做","Plan a small step"],build:["亲手试一试","Try your plan"],test:["看看结果","Look at the result"],improve:["试着改一点","Try a small change"],reflect:["说说学到了什么","Share what you learned"]}[s.id][locale==="zh-CN"?0:1]):t(s.description),question:primary?youngQuestion({task,stage:s.id,level:1,message:"",history:[],artifacts:{},completed:[]},locale==="zh-CN"):t(s.question)}));
   const [readiness,setReadiness]=useState(initialProject.readiness);
   const readinessRef=useRef(initialProject.readiness);
+  const [readyPrompt,setReadyPrompt]=useState<StageId|null>(null);
+  const activeRef=useRef(initialProject.active);
   const [readyDismissed,setReadyDismissed]=useState<Partial<Record<StageId,boolean>>>({});
   const [records,setRecords]=useState<Thinking>(initialProject.records);
   const [restored,setRestored]=useState(false);
@@ -90,7 +94,10 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   function latchReady(id:StageId,a:StageReadinessAssessment){
     if(!a.ready||readinessRef.current[id]?.ready)return;
     if(id===active)setCompletionWarning([]);
-    readinessRef.current={...readinessRef.current,[id]:a};setReadiness(readinessRef.current);
+    const show=shouldPromptReady(id,activeRef.current,completed,readinessRef.current[id],a)&&!finished;
+    // The provider cannot acknowledge a learner-facing dialog on the student's behalf.
+    readinessRef.current={...readinessRef.current,[id]:{...a,promptSeen:show}};setReadiness(readinessRef.current);
+    if(show)setReadyPrompt(id);
     researchEvent('STAGE_READY',{systemAction:'SEMANTIC_MINIMUM_EVIDENCE',reasonCategory:a.criterion,readinessSource:a.source,ready:true},id);
   }
   useEffect(()=>{const a=assessLocalReadiness(task,active,records);if(a.ready)latchReady(active,a);
@@ -100,14 +107,26 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const safetyBlocked=[...Object.values(records[active]??{}),conversations[active]?.filter(m=>m.role==='student').at(-1)?.text??''].some(text=>unsafeAction(task,text));
   const canContinue=(!safetyBlocked&&!!readiness[active]?.ready)||completed.includes(active);
   function completeStage(force=false){
-    if(finished||pendingRef.current.size||research.busy)return;
-    if(safetyBlocked&&!completed.includes(active)){setCompletionWarning([locale==='zh-CN'?'先停下这个不安全的动作，请和老师确认安全的做法。':'Pause the unsafe action and check a safe approach with your teacher.']);return;}
+    if(finished||pendingRef.current.size||research.busy)return false;
+    if(safetyBlocked&&!completed.includes(active)){setCompletionWarning([locale==='zh-CN'?'先停下这个不安全的动作，请和老师确认安全的做法。':'Pause the unsafe action and check a safe approach with your teacher.']);return false;}
     const missing=!canContinue;
-    if(!completed.includes(active)&&missing&&!(force&&researchVisible)){setCompletionWarning([locale==='zh-CN'?missingCue[active][0]:missingCue[active][1]]);return;}
+    if(!completed.includes(active)&&missing&&!(force&&researchVisible)){setCompletionWarning([locale==='zh-CN'?missingCue[active][0]:missingCue[active][1]]);return false;}
     if(force&&researchVisible&&missing)research.event('STAGE_OVERRIDE',{systemAction:'TEACHER_FORCE_CONTINUE'});
     if(!completed.includes(active)){setCompleted(prev=>[...prev,active]);research.complete(active,true);}
     setCompletionWarning([]);const next=nextStage(active);
-    if(next)enterStage(next);else research.finish();
+    if(next)enterStage(next);else {research.finish();focusWorkspace();}
+    return true;
+  }
+  function focusWorkspace(){requestAnimationFrame(()=>{const el=document.getElementById('main');el?.focus();el?.scrollIntoView({behavior:'smooth'});});}
+  function readyDecision(action:'ADVANCE'|'STAY'){
+    if(!readyPrompt)return;
+    if(action==='ADVANCE'){
+      // Reuse the guarded completion flow; log the choice before its completion/entry events.
+      if(finished||pendingRef.current.size||research.busy||safetyBlocked)return;
+      researchEvent('STAGE_READY_DECISION',{studentAction:action},readyPrompt);
+      if(!completeStage())return;
+    }else {researchEvent('STAGE_READY_DECISION',{studentAction:action},readyPrompt);focusWorkspace();}
+    setReadyPrompt(null);
   }
   function chooseSupport(accept:boolean){
     if(!adaptive.showRecommendation||(pendingRef.current.size>0||research.busy)||finished)return;
@@ -141,6 +160,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   function selectStage(id:StageId){if(!accessibleStage(id,active,completed,researchVisible))return;if(researchVisible&&!accessibleStage(id,active,completed))research.event("STAGE_OVERRIDE",{systemAction:"TEACHER_FREE_NAVIGATION"});enterStage(id);}
   function enterStage(id: StageId) {
     research.stage(id);
+    activeRef.current=id;
     setActive(id);
     requestAnimationFrame(()=>{const el=document.getElementById("main");el?.focus();el?.scrollIntoView({behavior:"smooth"});});
     setCompletionWarning([]);
@@ -229,6 +249,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
     <>
       <a href="#main" className="skip-link">{t("Skip to learning workspace")}</a>
       <Header onNavigate={navigate} />
+      {readyPrompt&&<ReadyTransitionModal final={readyPrompt==='reflect'} zh={locale==='zh-CN'} disabled={pending.length>0||research.busy||safetyBlocked} onDecision={readyDecision}/>}
       <div className="workspace-shell">
         <ProgressSidebar
           stages={stages}

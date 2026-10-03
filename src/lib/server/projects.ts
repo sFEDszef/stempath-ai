@@ -50,7 +50,7 @@ export class Projects {
    // Clients cannot forge a semantic READY receipt. Deterministic notes/conversations remain usable without AI.
    p.readinessPolicyVersion=READINESS_POLICY_VERSION;
    for(const stage of stageIds){const prior=old.readiness[stage],candidate=p.readiness[stage],local=assessLocalReadiness(p.task,stage,p.records,old.researchConfig.condition==='NO_AI'?[]:p.conversations[stage],'DEMO');
-    if(prior?.ready)p.readiness[stage]=prior;else if(verifiedReadiness(id,stage,candidate))p.readiness[stage]=candidate;else if(local.ready)p.readiness[stage]=local;else delete p.readiness[stage];
+    if(prior?.ready)p.readiness[stage]={...prior,...(candidate?.promptSeen===true?{promptSeen:true}:{})};else if(verifiedReadiness(id,stage,candidate))p.readiness[stage]=candidate;else if(local.ready)p.readiness[stage]={...local,...(candidate?.promptSeen===true?{promptSeen:true}:{})};else delete p.readiness[stage];
    }
    for(const stage of p.completed)if(!old.completed.includes(stage)&&[...Object.values(p.records[stage]??{}),p.conversations[stage]?.filter(m=>m.role==='student').at(-1)?.text??''].some(t=>unsafeAction(p.task,t)))return fail(400,'Address the unsafe action before continuing');
    if(user.role==='STUDENT'){if(!accessibleStage(p.active,old.active,p.completed))return fail(400,'Complete the earlier stage first');for(const stage of p.completed)if(!old.completed.includes(stage)&&(!p.readiness[stage]?.ready||!stageIds.slice(0,stageIds.indexOf(stage)).every(s=>p.completed.includes(s))))return fail(400,'One stage-relevant learner contribution is needed');}

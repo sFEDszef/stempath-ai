@@ -7,7 +7,7 @@ import type { CoachMetadata, StageId, STEMTask, SupportLevel, TaskType } from '@
 import type { ResearchConfig, Condition } from './config';
 import { initialLevel } from './config';
 export type Initiator='STUDENT'|'SYSTEM_RECOMMENDATION'|'RESEARCH_CONDITION';
-export type EventType='STAGE_READY'|'STAGE_OVERRIDE'|'CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
+export type EventType='STAGE_READY_DECISION'|'STAGE_READY'|'STAGE_OVERRIDE'|'CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
 export type Choice='AGREE'|'DISAGREE'|'NEED_EVIDENCE';
 export interface EventData {
  diagnostic?:string;reasonCategory?:string;readinessSource?:import('@/lib/stem/readiness').StageReadinessAssessment['source'];ready?:boolean;
@@ -44,7 +44,10 @@ function metadata(task:STEMTask,config:ResearchConfig,now:number):TaskRun {
 export function recordEvent(s:ResearchSession,eventType:EventType,data:EventData={},now=Date.now(),stage=s.currentStage,level=s.supportLevel):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
  if(eventType==='STAGE_READY'&&s.events.some(e=>e.eventType==='STAGE_READY'&&e.taskId===s.taskId&&e.stage===stage))return s;
- const {messageText,...meta}=data;
+ // READY decisions are enum-only, even when text capture is enabled.
+ const decision=eventType==='STAGE_READY_DECISION';
+ if(decision&&!['ADVANCE','STAY'].includes(data.studentAction??''))throw new Error('Invalid READY decision');
+ const {messageText,...meta}=decision?{studentAction:data.studentAction}:data;
  const event:InteractionEvent={...meta,eventId:uuid(),sessionId:s.sessionId,timestamp:stamp(now),taskId:s.taskId,stage,condition:s.condition,supportLevel:level,eventType,...(s.config.storeMessageText&&messageText!==undefined?{messageText:messageText.slice(0,4000)}:{})};
  const events=[...s.events,event];
  return {...s,updatedAt:stamp(now),interactionCount:s.interactionCount+1,events:events.slice(-5000),droppedEvents:s.droppedEvents+Math.max(0,events.length-5000)};

@@ -41,3 +41,11 @@ First readiness emits STAGE_READY once per task/stage: systemAction=SEMANTIC_MIN
 Tests cover the requested Chinese/English short contributions, level independence, learner-only evidence, actual-vs-future temporal distinctions, one note vs two notes, persistence/migration/latching, research event deduplication/privacy, NO_AI, structured provider output and one-call fallback, plus authenticated POSTGRES receipt/migration checks.
 
 An AI semantic classification remains probabilistic; local matching is conservative and approximate. Short ambiguous results need current-stage context. Self-reported actions are not verified physical observations. The lightweight existing pedagogical guard is not a complete semantic safety guarantee. Live model teaching quality and research validity still need human evaluation.
+
+## Learner choice at READY
+
+A new false → true transition in the active unfinished stage opens an accessible native dialog. It never advances automatically. ADVANCE uses the existing guarded completion/entry flow; STAY, Escape, the backdrop and the close control only dismiss it and restore workspace focus. The normal Finish button remains available. Reflect offers Finish Project and completes the existing session without an eighth stage.
+
+Each stage persists `promptSeen: true` when its prompt opens, alongside latched ready/criterion/source in LOCAL project snapshots and POSTGRES stage JSON. No schema migration or provider request is needed. Previously READY or completed stages do not open a prompt on restoration/revisit. Server merges may acknowledge a verified or locally evidenced READY stage but cannot forge readiness or clear a previous acknowledgement. Provider metadata cannot acknowledge the dialog on a learner's behalf.
+
+`STAGE_READY_DECISION` records only `studentAction: ADVANCE | STAY`, separately from STAGE_READY, STAGE_COMPLETED and STAGE_ENTERED. Decision events never contain raw learner text, even with text capture enabled.

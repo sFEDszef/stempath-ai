@@ -43,6 +43,7 @@ export function validateSession(value:unknown):IntegrityReport {
   require(Array.isArray(s.events)&&s.events.length<=5000,'Invalid event collection');
   let previous=Date.parse(s.startedAt);const ids=new Set<string>(),claims=new Map<string,string>();
   for(const e of s.events){require(e.sessionId===s.sessionId&&runs.has(e.taskId)&&!ids.has(e.eventId)&&typeof e.eventId==='string','Cross-session/task or duplicate event');ids.add(e.eventId);require(date(e.timestamp)&&Date.parse(e.timestamp)>=previous,'Events not ordered');previous=Date.parse(e.timestamp);require(e.condition===s.condition&&stageIds.includes(e.stage)&&[1,2,3].includes(e.supportLevel),'Invalid event policy');
+   if(e.eventType==='STAGE_READY_DECISION')require(['ADVANCE','STAY'].includes(e.studentAction??'')&&e.messageText===undefined,'Invalid readiness decision');
    if(e.eventType==='STAGE_READY'&&e.systemAction==='SEMANTIC_MINIMUM_EVIDENCE')require(e.ready===true&&e.reasonCategory===readinessCriteria[e.stage]&&['AI_SEMANTIC','LOCAL_RECORD','DEMO'].includes(e.readinessSource??''),'Invalid readiness event');
    if(e.eventType==='AI_CHALLENGE_STARTED'){require(!!e.challengeId&&!claims.has(e.challengeId),'Invalid challenge start');claims.set(e.challengeId!,e.taskId+e.stage);}
    if(['AI_CHALLENGE_RESPONSE','AI_CHALLENGE_FOLLOW_UP'].includes(e.eventType))require(!!e.challengeId&&claims.get(e.challengeId)===e.taskId+e.stage,'Unlinked challenge event');
