@@ -1,3 +1,5 @@
+import {shouldPromptReady,readyPromptCopy} from '@/lib/stem/readyPrompt';
+import {finishSession} from '@/lib/research/session';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 vi.mock('server-only',()=>({}));
 import {assessLocalReadiness,evidenceForStage,requestReadiness,semanticReadiness,readinessCriteria,readinessInstruction,READINESS_POLICY_VERSION} from '@/lib/stem/readiness';
@@ -43,4 +45,16 @@ describe('one structured provider request, independent pedagogy checks',()=>{
  it('plain valid coaching is retained if JSON parsing fails',async()=>{output(reply);expect((await deepseekProvider(base)).text).toBe(reply);expect(fetch).toHaveBeenCalledTimes(1);});
  it('structured output never weakens text safety',async()=>{output(JSON.stringify({reply:'1. Build the body\n2. Add wheels',readiness:{ready:true,criterion:'BASIC_TASK_GOAL'}}));await expect(deepseekProvider(base)).rejects.toMatchObject({code:'pedagogy'});expect(fetch).toHaveBeenCalledTimes(1);});
  it('NO_AI uses records and makes zero provider requests',async()=>{expect(assessLocalReadiness(task,'understand',{'understand':{'Problem statement':'让小车跑远一点'}}).ready).toBe(true);await expect(respond({...base,research:conditionConfig('NO_AI')})).rejects.toMatchObject({status:403});expect(fetch).not.toHaveBeenCalled();});
+});
+
+describe('one-time READY transition choices',()=>{
+ const ready={ready:true,criterion:'ONE_IDEA' as const,source:'DEMO' as const};
+ it('opens only on false to true in the active unfinished stage',()=>{expect(shouldPromptReady('imagine','imagine',[],undefined,ready)).toBe(true);expect(shouldPromptReady('imagine','understand',[],undefined,ready)).toBe(false);expect(shouldPromptReady('imagine','imagine',[],undefined,{...ready,ready:false})).toBe(false);});
+ it('ADVANCE records decision before completion and canonical entry',()=>{let s=enterStage(startSession(task,conditionConfig()),'imagine');s=recordEvent(s,'STAGE_READY_DECISION',{studentAction:'ADVANCE'});s=enterStage(completeStage(s,'imagine'),'plan');expect(s.events.slice(-3).map(e=>e.eventType)).toEqual(['STAGE_READY_DECISION','STAGE_COMPLETED','STAGE_ENTERED']);expect(s.completedStages).toContain('imagine');expect(s.currentStage).toBe('plan');});
+ it('STAY never completes or enters another stage',()=>{const s=recordEvent(enterStage(startSession(task,conditionConfig()),'imagine'),'STAGE_READY_DECISION',{studentAction:'STAY'});expect(s.completedStages).toEqual([]);expect(s.currentStage).toBe('imagine');});
+ it('later chatting cannot reopen a latched acknowledged stage',()=>expect(shouldPromptReady('imagine','imagine',[],{...ready,promptSeen:true},ready)).toBe(false));
+ it('refresh preserves READY, promptSeen and manual progression without AI',()=>{const p=newProject(task);p.active='imagine';p.readiness.imagine={...ready,promptSeen:true};const next=parseProject(JSON.parse(JSON.stringify(p)));expect(next.readiness.imagine).toEqual(p.readiness.imagine);expect(shouldPromptReady('imagine',next.active,next.completed,next.readiness.imagine,ready)).toBe(false);expect(next.readiness.imagine?.ready).toBe(true);});
+ it('completed revisits and already-READY legacy projects do not prompt',()=>{expect(shouldPromptReady('imagine','imagine',['imagine'],undefined,ready)).toBe(false);expect(shouldPromptReady('imagine','imagine',[],ready,ready)).toBe(false);});
+ it('Reflect finishes without an eighth stage, with final copy in both languages',()=>{expect(readyPromptCopy(true,true).advance).toBe('完成项目');expect(readyPromptCopy(true,false).advance).toBe('Finish Project');let s=startSession(task,conditionConfig());for(const stage of Object.keys(readinessCriteria) as StageId[])s=completeStage(enterStage(s,stage),stage);s=finishSession(s);expect(s.completedStages).toHaveLength(7);expect(s.currentStage).toBe('reflect');expect(s.completedAt).toBeDefined();});
+ it.each(['Escape','backdrop','close'])('%s dismissal has STAY semantics and no raw text',()=>{const s=recordEvent(startSession(task,{...conditionConfig(),storeMessageText:true}),'STAGE_READY_DECISION',{studentAction:'STAY',messageText:'Never store this',reasonCategory:'Never store this'});expect(s.events.at(-1)).toMatchObject({eventType:'STAGE_READY_DECISION',studentAction:'STAY'});expect(s.events.at(-1)).not.toHaveProperty('messageText');expect(s.events.at(-1)).not.toHaveProperty('reasonCategory');expect(s.completedStages).toEqual([]);});
 });

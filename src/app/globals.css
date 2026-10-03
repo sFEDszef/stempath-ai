@@ -1715,3 +1715,11 @@ button:disabled {cursor:not-allowed;opacity:.55;}
 
 /* Participant mode reuses the calm learner layout. */
 .account-bar{display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:8px 24px;background:#f2f7f4;color:#436354;font-size:.85rem}.participant-login{max-width:420px;margin:48px auto}.participant-login label,.account-admin form label{display:block;margin:12px 0}.participant-login input,.account-admin input:not([type=checkbox]),.account-admin select,.account-admin textarea{display:block;width:100%;padding:10px;border:1px solid #d7e2dc;border-radius:8px;margin-top:6px}.account-table{overflow-x:auto}.account-admin table{width:100%;border-collapse:collapse;margin:12px 0}.account-admin td,.account-admin th{text-align:left;padding:10px;border-bottom:1px solid #dce7df}.account-admin td button{margin:4px}.credential-output{background:#f5faf7;padding:16px;margin:20px 0}.account-admin .hub-confirm .hub-card{max-width:520px}.account-admin textarea{resize:vertical}
+
+.ready-transition { width: 510px; }
+.ready-transition .modal-heading { gap: 16px; align-items: flex-start; }
+.ready-transition .modal-heading h2 { line-height: 1.5; }
+.ready-transition #ready-transition-body { white-space: pre-line; line-height: 1.8; margin-bottom: 24px; }
+.ready-transition-actions { display: flex; flex-direction: column; gap: 12px; }
+.ready-transition-actions button { min-height: 48px; padding: 12px 16px; justify-content: center; }
+.ready-transition-actions button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }

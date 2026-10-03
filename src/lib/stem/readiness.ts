@@ -3,7 +3,7 @@ import {stageCheckpoints} from './stageCheckpoints';
 export const READINESS_POLICY_VERSION='gentle-v1' as const;
 export const readinessCriteria={understand:'BASIC_TASK_GOAL',imagine:'ONE_IDEA',plan:'ONE_ACTIONABLE_NEXT_STEP',build:'ACTUAL_ATTEMPT',test:'ACTUAL_RESULT',improve:'ONE_REVISION',reflect:'ONE_TAKEAWAY'} as const;
 export type ReadinessCriterion=typeof readinessCriteria[StageId];
-export interface StageReadinessAssessment {ready:boolean;criterion?:ReadinessCriterion;missing?:ReadinessCriterion;source:'AI_SEMANTIC'|'LOCAL_RECORD'|'DEMO';attestation?:string;}
+export interface StageReadinessAssessment {ready:boolean;criterion?:ReadinessCriterion;missing?:ReadinessCriterion;source:'AI_SEMANTIC'|'LOCAL_RECORD'|'DEMO';attestation?:string;promptSeen?:boolean;}
 export type StageReadiness=Partial<Record<StageId,StageReadinessAssessment>>;
 const trivial=/^(?:好的?|嗯+|不知道|不懂|没懂|不确定|随便|下一步|继续|ok(?:ay)?|yes|no|idk|thanks|thank you|not sure|i don['’]?t (?:know|understand))[。.!?？\s]*$/i;
 function learnerText(text:string){return text.replace(/^Regarding this unverified claim: “[^]*?”\n\n/,'');}
@@ -39,7 +39,7 @@ export function requestReadiness(r:ChatRequest,source:StageReadinessAssessment['
 }
 export function parseReadiness(value:unknown,stage:StageId,source:StageReadinessAssessment['source']):StageReadinessAssessment|undefined{
  if(!value||typeof value!=='object')return;const v=value as Record<string,unknown>,criterion=readinessCriteria[stage];
- if(v.ready===true&&v.criterion===criterion)return {ready:true,criterion,source,...(typeof v.attestation==='string'&&v.attestation.length<=128?{attestation:v.attestation}:{})};
+ if(v.ready===true&&v.criterion===criterion)return {ready:true,criterion,source,...(v.promptSeen===true?{promptSeen:true}:{}),...(typeof v.attestation==='string'&&v.attestation.length<=128?{attestation:v.attestation}:{})};
  if(v.ready===false&&v.missing===criterion)return {ready:false,missing:criterion,source};
 }
 export function semanticReadiness(value:unknown,r:ChatRequest){
