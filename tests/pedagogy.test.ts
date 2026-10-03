@@ -23,5 +23,5 @@ describe('adaptive scaffolding behavior',()=>{
 });
 
 it('support choice messages do not count as new learner evidence',()=>{const r=scenario(progress,{level:2});const original=decidePedagogicalAction(r).state;const changed=decidePedagogicalAction({...r,history:[...r.history,{role:'student',text:r.message}],intent:'support-change',message:'Please continue at my chosen support level.'}).state;expect(changed.consecutiveProductiveResponses).toBe(original.consecutiveProductiveResponses);expect(changed.progressScore).toBe(original.progressScore)});
-it('claim quotation does not override the language of the student response',()=>{expect(adaptiveDemo({...base,intent:'evaluate-claim',message:'Regarding this unverified claim: “One result means the method always works under all conditions.”\n\n我不同意，需要更多证据。'}).suggestions[0]).toMatch(/我/)});
+it('claim quotation does not override the language of the student response',()=>{expect(adaptiveDemo({...base,intent:'evaluate-claim',message:'Regarding this unverified claim: “One result means the method always works under all conditions.”\n\n我不同意，需要更多证据。'}).text).toMatch(/[\u3400-\u9fff]/)});
 it('minimum goal evidence offers READY before optional success discussion',()=>{for(const texts of [progress.slice(0,1),progress.slice(0,2),progress])expect(adaptiveDemo(scenario(texts,{level:2})).text).toContain('enough for this step')});

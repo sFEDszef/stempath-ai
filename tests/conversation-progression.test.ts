@@ -75,7 +75,7 @@ describe('gentle READY and optional exploration at all seven stages',()=>{
    expect(response.text).not.toContain(question);expect(pedagogicallyValid(response.text,r)).toBe(true);
    const stay={...append(r,response.text,'我想继续想一想。'),stageReady:true};
    const extra=demoProvider(stay);
-   expect(extra.text).toContain('如果你还想多想一点');expect(extra.text).not.toMatch(/还差|你还需要|必须完成/);
+   expect(extra.text).toContain('按自己的兴趣继续探索');expect(extra.text).not.toMatch(/还差|你还需要|必须完成/);
    expect(pedagogicallyValid(extra.text,stay)).toBe(true);expect(stay.artifacts).toEqual({});
   }
  });
@@ -85,7 +85,7 @@ describe('gentle READY and optional exploration at all seven stages',()=>{
   const answer=append(r,first,'这个任务要让小车跑起来。');
   const ready=adaptiveDemo(answer).text;expect(ready).toContain('这一步已经够用了');
   const second=adaptiveDemo({...append(answer,ready,'我想留下多想一点。'),stageReady:true}).text;
-  expect(second).toContain('找出怎样才算成功');expect(second).not.toContain('1. 找出任务要做的事');
+  expect(second).toContain('做到什么样，就算成功');expect(second).not.toContain('1. 找出任务要做的事');
  });
  it('both conversation slots lead to optional exploration without re-asking either',()=>{const r={...base,stageReady:true,history:[...base.history,{role:'student' as const,text:base.message},{role:'assistant' as const,text:'你亲手试过哪一小步？'},{role:'student' as const,text:'我把帆装上去了。'}],message:'我想多想一点'};for(const level of [1,2,3] as const){const reply=adaptiveDemo({...r,level});expect(conversationProgress(r).slots).toEqual([true,true]);expect(repeatsAnsweredQuestion(reply.text,{...r,level})).toBe(false);expect(pedagogicallyValid(reply.text,{...r,level})).toBe(true);}});
  it('Level 2 never repeats an answered frame',()=>{
@@ -113,7 +113,7 @@ describe('provider anti-repetition, safe fallback and suggestions',()=>{
   const messages=buildDeepSeekMessages({...base,stageReady:true});
   expect(messages[0].content).toContain('Never ask the same substantive question twice');
   expect(messages[0].content).toContain('Blank structured records');
-  expect(JSON.parse(messages[1].content).conversationProgress).toEqual({slots:{ACTUAL_ATTEMPT:false,OBSERVATION:true},minimumReady:false,optionalDeepening:true});
+  expect(JSON.parse(messages[1].content).conversationProgress).toEqual({slots:{ACTUAL_ATTEMPT:false,OBSERVATION:true},minimumReady:false,optionalDeepening:true,answeredChoice:false,futureIntent:false,prediction:false,notDone:false});
   expect(evidenceSlots.build).toEqual(['ACTUAL_ATTEMPT','OBSERVATION']);
  });
  it('DeepSeek pedagogical fallback uses the same progress without another paid call',async()=>{
@@ -124,16 +124,7 @@ describe('provider anti-repetition, safe fallback and suggestions',()=>{
   expect(reply.text).toContain('你已经说出了看到的结果');expect(reply.text).not.toContain('我看到发生了： ___');
   expect(fetch).toHaveBeenCalledTimes(1);
  });
- it('target suggestions vary without fabricated learner actions or cross-task objects',()=>{
-  const first=suggestedReplies('zh',base);
-  const second=suggestedReplies('zh',{...base,message:'',history:[]});
-  expect(first[0]).toContain('刚才的尝试');expect(second[0]).toContain('刚才的尝试');
-  expect(first).not.toEqual(second);
-  const task=demoTasks.find(t=>t.id==='plants')!;
-  expect(suggestedReplies('zh',{...base,task}).join(' ')).not.toMatch(/帆|小车|轮子/);
-  expect(suggestedReplies('zh',{...base,stage:'test',stageReady:true,message:'2.1米',history:[]} )[0]).toContain('和目标的比较');
- });
- it.each(['zh','en'] as const)('suggestions at %s never invent readiness',language=>{for(const stage of Object.keys(evidenceSlots) as StageId[]){const r={...base,stage,history:[],message:''};for(const message of suggestedReplies(language,r))expect(demoProvider({...r,message}).readiness?.ready).toBe(false);}});
+ it.each(['zh','en'] as const)('ordinary suggestions remain empty in %s',language=>{for(const stage of Object.keys(evidenceSlots) as StageId[])expect(suggestedReplies(language,{...base,stage})).toEqual([]);});
  it('keeps full saved chat but research exports OFF never include its raw text',()=>{
   let s=startSession(base.task,conditionConfig());
   s=recordEvent(s,'MESSAGE_SENT',{messageText:base.message});

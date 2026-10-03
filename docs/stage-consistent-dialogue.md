@@ -1,0 +1,11 @@
+# Stage-consistent dialogue and free-text responses
+
+Ordinary coaching returns `suggestions: []` in Demo, real DeepSeek and API boundary replies. Historical messages still parse their old suggestions, but ChatMessage never renders them. Retry, READY decisions, support controls, AI Challenge and upload actions remain system controls.
+
+Conversation progress derives stage evidence, answered previous choices, future intent, predictions and a not-yet-done pause from learner-authored stage history. Choice/future-intent recognition never grants Build ACTUAL_ATTEMPT or Test ACTUAL_RESULT. Evidence witnesses plus a recent intent witness and recent turns fit the existing 12-turn request limit. No duplicate persistent text or research schema is added. Research text capture OFF remains unchanged.
+
+Build redirects future intent to actual action. Test acknowledges predictions and asks for actual results. A learner who has not tried the physical step can leave and return without another artificial question. Level 3 uses stronger scaffolding when useful, then follows the answer instead of repeatedly resetting A/B/C. DeepSeek receives the same categorical progress, a stage-consistency policy and a conservative response guard; Auto falls back once to the same Demo semantics without paid regeneration.
+
+The final ceremony is separate from READY. Explicit Reflect completion, all seven completed stages, completed research session and a successful persistence barrier precede the dialog. `completionCelebrationSeen` is saved before showing it; reopening never shows it automatically. LOCAL uses the existing project snapshot. POSTGRES uses a version-checked transaction and a boolean column. Existing completed projects migrate as already seen. No eighth stage, AI call, new research event or changed completion timing is introduced. Text attribution only: Harrier Du Bois, clearly fictional.
+
+POSTGRES operators must apply the committed `0003_completion_celebration` migration with `pnpm db:migrate` before running this version. Migrations remain a separate deployment step. Current Vercel LOCAL mode needs no database configuration. No production database or participant accounts are provisioned by this release.
