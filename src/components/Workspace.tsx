@@ -16,7 +16,7 @@ import {useI18n} from "@/lib/i18n";
 import {ReadyTransitionModal} from "./ReadyTransitionModal";
 import {shouldPromptReady} from "@/lib/stem/readyPrompt";
 import {StageCheckpoint} from "./StageCheckpoint";
-import {boundedHistory} from "@/lib/stem/context";
+import {conversationHistory} from "@/lib/stem/conversationProgress";
 import {youngReply,youngQuestion} from "@/lib/stem/youngLearner";
 import {targetGradeBand} from "@/lib/stem/gradeBands";
 import {unsafeAction,assessLocalReadiness,parseReadiness,readinessCopy,missingCue,type StageReadinessAssessment} from '@/lib/stem/readiness';
@@ -77,8 +77,8 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
-  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}];
-  const adaptiveRequest:ChatRequest={projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:boundedHistory(messages),artifacts:records,completed,mode,research:config};
+  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en',{task,stage:active,level,message:'',history:[],artifacts:records,completed})}];
+  const adaptiveRequest:ChatRequest={stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:conversationHistory({task,stage:active},messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
   useEffect(()=>{researchLanguage(lang);},[lang,researchLanguage]);
@@ -134,7 +134,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
     research.event(fade?(accept?'FADING_ACCEPTED':'FADING_REJECTED'):(accept?'ESCALATION_ACCEPTED':'ESCALATION_REJECTED'),{supportRecommendation:adaptive.decision.recommendation,fadingAccepted:fade?accept:undefined,escalationAccepted:!fade?accept:undefined});
     const next=adaptive.resolveRecommendation(accept);
     if(accept&&next){research.support(next,'SYSTEM_RECOMMENDATION');setLevel(next);
-      const history=boundedHistory(messages);
+      const history=conversationHistory({task,stage:active},messages);
       void deliver({...adaptiveRequest,level:next,previousLevel:level,history,intent:'support-change',message:locale==='zh-CN'?'请按我选择的支持等级继续引导。':'Please continue at my chosen support level.'});
     }
   }
@@ -173,8 +173,8 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
               {
                 id: crypto.randomUUID(),
                 role: "assistant",
-                text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngReply({...adaptiveRequest,stage:id,history:[],message:""},locale==='zh-CN')}`,
-                suggestions: suggestedReplies(locale==='zh-CN'?'zh':'en'),
+                text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngReply({...adaptiveRequest,stage:id,stageReady:!!readiness[id]?.ready,history:[],message:""},locale==='zh-CN')}`,
+                suggestions: suggestedReplies(locale==='zh-CN'?'zh':'en',{...adaptiveRequest,stage:id,stageReady:!!readiness[id]?.ready,history:[],message:''}),
               },
             ],
           },
@@ -206,7 +206,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   async function send(text: string, claim?:string) {
     if (!text.trim() || (pendingRef.current.size>0||research.busy)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
-    const request:ChatRequest = {projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:boundedHistory(messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
+    const request:ChatRequest = {stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:conversationHistory({task,stage:active},messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
     adaptive.onStudentTurn();
     const decision=decidePedagogicalAction({...request,message:text.trim()});
     research.event('MESSAGE_SENT',{messageText:text.trim(),learnerSignal:Object.entries(decision.state.signals).filter(([,v])=>v).map(([key])=>key),pedagogicalDecision:decision.action,supportRecommendation:decision.recommendation});
@@ -219,7 +219,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   }
   function retry() {
     const failed = chatErrors[active];
-    if(!failed&&messages.at(-1)?.role==='student'){void deliver({...adaptiveRequest,message:messages.at(-1)!.text,history:boundedHistory(messages.slice(0,-1))});return;}
+    if(!failed&&messages.at(-1)?.role==='student'){void deliver({...adaptiveRequest,message:messages.at(-1)!.text,history:conversationHistory(adaptiveRequest,messages.slice(0,-1))});return;}
     // Reuse the failed turn without adding another student bubble; honour the current meter.
     if (failed?.retryable) void deliver({...failed.request,level,mode,research:config});
   }
@@ -278,7 +278,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
             mode={responseMode??(mode==="auto"?undefined:mode)}
             stage={stage}
             level={level}
-            messages={messages.map(m=>m.role==='assistant'&&m.suggestions?.length?{...m,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en')}:m)}
+            messages={messages}
             busy={(pending.length>0||research.busy)}
             onSend={text=>void send(text)}
             error={chatErrors[active]??(!pending.length&&messages.at(-1)?.role==='student'?{message:t("The coach could not respond. Please retry."),retryable:true}:undefined)}

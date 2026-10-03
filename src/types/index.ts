@@ -18,6 +18,8 @@ export interface Message {
 }
 export interface ChatRequest {
   projectId?:string;
+  /** Conversation mode only; never grants readiness or completes a stage. */
+  stageReady?:boolean;
   interfaceLanguage?: "zh-CN"|"en";
   taskLanguage?: "zh-CN"|"en";
   stage: StageId;

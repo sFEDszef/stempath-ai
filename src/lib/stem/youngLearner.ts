@@ -1,7 +1,9 @@
 import type {ChatRequest,StageId} from '@/types';
-import {stageCheckpoints,hasCheckpointText} from './stageCheckpoints';
+import {stageCheckpoints} from './stageCheckpoints';
 import {supportAcknowledgement} from './supportLevels';
 import {targetGradeBand} from './gradeBands';
+import {conversationProgress,repeatsAnsweredQuestion} from './conversationProgress';
+import {readinessCopy} from './readiness';
 const questions:Record<StageId,[[string,string],[string,string]]>={
  understand:[['这个任务要你做什么？','What does this task ask you to do?'],['做到什么样，就算成功？','What would count as success?']],
  imagine:[['你想到一个什么办法或猜想？','What is one idea or guess you have?'],['你想先试哪一个想法？','Which idea do you want to try?']],
@@ -11,7 +13,6 @@ const questions:Record<StageId,[[string,string],[string,string]]>={
  improve:[['你觉得哪里值得改一改？','What is one thing worth changing?'],['你准备怎么改这一点？','How will you change that part?']],
  reflect:[['你学会了什么，或改变了什么想法？','What is one thing you learned?'],['哪次发现让你这样想？','What happened that helped you learn this?']]
 };
-const confusion=/不知道|不懂|什么意思|没懂|太难|不确定|不会|没明白|\b(?:don['’]?t|do not)\s+(?:really\s+)?(?:know|understand)|what does .*mean|no idea|not sure/i;
 const hints:Record<StageId,[string,string]>={
  understand:['先看看题目里要你做什么，以及怎样才算成功。','Look for what the task asks you to do and what counts as success.'],
  imagine:['可以先想一种与题目有关的可能，再和另一种比较。','Think of one possibility related to the task, then compare it with another.'],
@@ -39,33 +40,45 @@ const microSteps:Record<StageId,[[string,string],[string,string],[string,string]
  improve:[['找一条真实观察','Find one actual observation'],['选一处想改的地方','Choose one part to change'],['决定怎样检查变化','Decide how to check the change']],
  reflect:[['回想一次亲手尝试','Recall one thing you tried'],['找出一个变化的想法','Find one idea that changed'],['联系那次经历','Connect it to that experience']]
 };
-function focusIndex(request:ChatRequest){
- const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core);
- let index=core.findIndex(c=>!hasCheckpointText(request.artifacts[request.stage]?.[c.field]??''));
- // Visible answers can move the conversation forward; they do not fill saved fields or mark mastery.
- const latest=request.intent==='support-change'?request.history.findLast(m=>m.role==='student')?.text??'':request.message;
- if(index===0&&!confusion.test(latest)&&hasCheckpointText(latest))index=1;
- return index;
-}
-export function youngQuestion(request:ChatRequest,zh:boolean){const index=focusIndex(request);return index<0?(zh?'你想再检查自己记录的哪一点？':'Which part of your notes would you like to check?'):questions[request.stage][index===1?1:0][zh?0:1];}
+function focusIndex(request:ChatRequest){return conversationProgress(request).target;}
+export function youngQuestion(request:ChatRequest,zh:boolean){const index=focusIndex(request);return index===2?(zh?'如果还想多想一点，你想再检查哪一点？':'If you want to explore more, what would you check next?'):questions[request.stage][index][zh?0:1];}
 export function youngReply(request:ChatRequest,zh:boolean){
- const i=zh?0:1,index=focusIndex(request),confused=confusion.test(request.message);
- const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core);
- const first=core[index<0?0:index===1?1:0];
- let question=confused&&index>=0?repairs[request.stage][index===1?1:0][i]:youngQuestion(request,zh);
- const previousAssistant=request.history.findLast(m=>m.role==='assistant')?.text??'';
- if(confused&&previousAssistant.includes(question))question=zh?'你想先弄懂题目里的哪个词？':'Which word in the task would you like explained first?';
- const repair=confused?(zh?'换个简单说法，我们只想一小步。':'Let’s say it more simply and take one small step.')+' ':'';
- const ack=request.intent==='support-change'?supportAcknowledgement(request.level,request.previousLevel,zh)+'\n\n':'';
- const clue=hints[request.stage][i];
- const criterion=request.stage==='understand'?request.task.successCriteria?.[0]:undefined;
+ const i=zh?0:1,progress=conversationProgress(request),index=progress.target===2?1:progress.target;
+ const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core),first=core[index];
+ const previous=request.history.filter(m=>m.role==='assistant').slice(-3);
+ const support=request.intent==='support-change'?supportAcknowledgement(request.level,request.previousLevel,zh)+'\n\n':'';
+ const acknowledgement=progress.latest[0]?readinessCopy[request.stage][i]:progress.latest[1]?
+  (zh?'你已经说出了'+(request.stage==='build'?'看到的结果。':'这一点。'):'You have shared '+(request.stage==='build'?'what happened.':'that part.')):'';
+ // Readiness is deliberately one contribution, not completion of both conversation slots.
+ if(progress.ready&&!request.stageReady){
+  const choices=zh?['你想怎样继续？','你想进入下一阶段，还是留下再想一想？','你想现在继续，还是多探索一点？','你想选择哪种继续方式？']:['How would you like to continue?','Would you like to move on or stay to think more?','Would you like to continue now or explore more?','Which way would you like to continue?'];
+  const question=choices.find(q=>!previous.some(m=>m.text.includes(q)))??choices[request.history.length%choices.length];
+  const transition=request.stage==='reflect'?(zh?' 这一步已经够用了！你可以选择完成项目，或留在这里多想一点。':' You have enough for this step! You can finish the project or stay to explore more. '):(zh?' 这一步已经够用了！你可以选择进入下一阶段，或留在这里多想一点。':' You have enough for this step! You can move on or stay to explore more. ');
+  return support+acknowledgement+transition+question;
+ }
+ const optional=progress.ready||request.stageReady;
+ const prefix=optional?(zh?'如果你还想多想一点，':'If you want to explore a little more, '):'';
+ const repair=progress.confused?(zh?'换个简单说法，我们只想一小步。':'Let’s say it more simply and take one small step.')+' ':'';
+ let question=progress.confused?repairs[request.stage][index][i]:youngQuestion(request,zh);
+ if(optional&&request.stage==='imagine'&&progress.target===1)question=zh?'你觉得还有什么不同的办法？':'What other different idea could you compare?';
+ const clue=progress.target===1?(zh?'可以看看这一点和刚才的回答有什么联系。':'You can connect this part with what you just shared.'):hints[request.stage][i];
+ const criterion=request.stage==='understand'&&request.level>1&&progress.target===0?request.task.successCriteria?.[0]:undefined;
  const fact=criterion?(zh?`题目写着：“${criterion.slice(0,120)}”。`:`The task says: “${criterion.slice(0,120)}”.`):clue;
- if(request.level===1)return `${ack}${repair}${clue} ${question}`;
- if(request.level===2)return `${ack}${repair}${fact}\n\n${zh?'可以先填一小句：':'Try one small sentence: '}${zh?first.zh:first.en} ___${zh?'。':'.'} ${question}`;
- const steps=microSteps[request.stage];
- const options=zh?`A. ${steps[index===1?1:0][i]}；B. 先解释题目里卡住的词；C. 用自己的起点：___。`:`A. ${steps[index===1?1:0][i]}; B. Explain a word in the task first; C. Your own starting point: ___.`;
- let immediate=confused?(zh?'现在只选一个起点：你想先选 A、B，还是 C？':'Choose just one starting point: would you start with A, B, or C?'):question;
- if(confused&&previousAssistant.includes(immediate))immediate=zh?'现在只说一个你卡住的词，可以吗？':'Could you name just one word you are stuck on?';
- return `${ack}${repair}${fact}\n\n${zh?'我们分三小步来：':'Let’s take three small steps:'}\n${steps.map((step,n)=>`${n+1}. ${step[i]}`).join('\n')}\n\n${zh?'现在只做当前这一小步，后面的先不用填。':'Work on just the current small step; leave the others for later.'} ${zh?first.zh:first.en} ___\n${options}\n${immediate}`;
+ const frame=`${zh?'可以先填一小句：':'Try one small sentence: '}${zh?first.zh:first.en} ___${zh?'。':'.'}`;
+ const usedFrame=previous.some(m=>m.text.includes(zh?first.zh:first.en));
+ const lead=[support.trim(),acknowledgement,repair.trim(),prefix+fact].filter(Boolean).join(' ');
+ let text=request.level===1?`${lead} ${question}`:request.level===2?
+  `${lead}\n\n${usedFrame?(zh?'可以选：A. 用自己的话说一点；B. 先解释卡住的词。':'Choose: A. Share a small part in your own words; B. Explain an unclear word.'):frame} ${question}`:
+  `${lead}\n\n${previous.length===0&&progress.target===0?`${zh?'我们分三小步来：':'Let’s take three small steps:'}\n${microSteps[request.stage].map((step,n)=>`${n+1}. ${step[i]}`).join('\n')}\n\n`:''}${zh?'现在只做当前这一小步，后面的先不用填。':'Work on just the current small step; leave the others for later.'} ${usedFrame?'':frame}\nA. ${microSteps[request.stage][progress.target][i]}${zh?'；B. 先解释卡住的词；C. 用自己的起点。':' ; B. Explain a word you are stuck on; C. Use your own starting point.'}\n${progress.confused?(zh?'现在只选一个起点：你想先选 A、B，还是 C？':'Choose just one starting point: would you start with A, B, or C?'):question}`;
+ // A repeated scaffold/question must change even on confusion. Use the next unused simple wording.
+ if(repeatsAnsweredQuestion(text,request)){
+  const alternatives=progress.confused?
+   (zh?['你想先弄懂题目里的哪个词？','你卡在哪一小处？','你能指一指不明白的那句话吗？','你想让我把哪一点说得更简单？']:['Which word would you like explained?','Which small part feels confusing?','Which sentence feels unclear?','Which part should I make simpler?']):
+   progress.target===2?(zh?['如果再做一次，你想检查哪一点？','你还想探索自己的哪个想法？','你想怎样继续探索？']:['If you tried again, what would you check?','Which of your ideas would you like to explore more?','How would you like to explore further?']):
+   (zh?[repairs[request.stage][index][0],'接着这一点，你想说哪一小句？','你还想补充自己的哪一点？','你想怎样继续探索？']: [repairs[request.stage][index][1],'What small part would you add next?','What else would you like to share?','How would you like to explore further?']);
+  question=alternatives.find(q=>!previous.some(m=>m.text.includes(q)))??alternatives[0];
+  text=`${support}${acknowledgement} ${repair}${optional?prefix:''}${request.level===1?clue:request.level===2?(zh?'可以选：A. 用自己的话说一点；B. 先说卡住的词。':'Choose: A. Share a small part in your own words; B. Name an unclear word.'):(zh?'A. 只看当前这一小步；B. 解释一个词；C. 用自己的起点。':'A. Look at only the current small step; B. Explain a word; C. Use your own starting point.')} ${question}`;
+ }
+ return text.trim();
 }
-export function gradeStagePolicy(request:ChatRequest){const band=targetGradeBand(request.task);return `Target grade band: ${band}. Optional learner record prompts: ${stageCheckpoints(request.task,request.stage,request.research?.condition!=='NO_AI').filter(c=>c.core).map(c=>c.en).join('; ')}. Encourage ONE small contribution at a time. Records are notes, not progression gates; one minimum stage-relevant contribution is enough to continue. Use the selected support level: Level 1 adds a clue and simpler question; Level 2 adds a partial frame or limited choice; Level 3 briefly explains, decomposes into 2–3 micro-steps and asks ONLY the first small decision, then continues after the child answers. Do not present a long worksheet. Do not require every optional field or fill all checkpoints. Help notice supplied successCriteria without designing the solution. Never repeat the same question after confusion. A brief purpose cue may explain why a question matters. Use current-task objects only; never import an example from another task. No AI-literacy reflection in NO_AI.`;}
+export function gradeStagePolicy(request:ChatRequest){const band=targetGradeBand(request.task);return `Target grade band: ${band}. Optional learner record prompts: ${stageCheckpoints(request.task,request.stage,request.research?.condition!=='NO_AI').filter(c=>c.core).map(c=>c.en).join('; ')}. Encourage ONE small contribution at a time. Records are notes, not progression gates; one minimum stage-relevant contribution is enough to continue. Use the selected support level: Level 1 adds a clue and simpler question; Level 2 adds a partial frame or limited choice; Level 3 briefly explains, decomposes into 2–3 micro-steps and asks ONLY the first small decision, then continues after the child answers. Do not present a long worksheet. Do not require every optional field or fill all checkpoints. Help notice supplied successCriteria without designing the solution. Never ask the same substantive question after a relevant answer. Use cumulative current-stage chat evidence even when records are blank. After confusion change and simplify the wording. After a completed micro-step continue with the next missing part, never restart the scaffold. When minimum evidence is reached acknowledge readiness without a mandatory second checkpoint; after the learner stays, further exploration is optional. A brief purpose cue may explain why a question matters. Use current-task objects only; never import an example from another task. No AI-literacy reflection in NO_AI.`;}
