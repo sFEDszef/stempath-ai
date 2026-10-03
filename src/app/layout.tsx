@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   creator: "Tequila Sunset",
   authors: [{ name: "Tequila Sunset" }],
   // Content-versioned URLs refresh cached browser and home-screen icons.
-  // The header artwork is intentionally independent of these website icons.
+  // The header and website icons use the same supplied official artwork.
   icons: {
     icon: [
       { url: "/favicon.ico?v=256e7993ff86", type: "image/x-icon", sizes: "16x16 32x32 48x48" },
