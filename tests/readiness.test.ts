@@ -35,7 +35,7 @@ describe('durable readiness and research privacy',()=>{
  it('new policy does not relabel v4 research archives',()=>{const s=startSession(task,conditionConfig());delete s.readinessPolicyVersion;delete s.configSnapshot.readinessPolicyVersion;s.promptVersion='young-learner-v4';s.configSnapshot.promptVersion='young-learner-v4';const out=JSON.parse(exportJSON(s));expect(out.promptVersion).toBe('young-learner-v4');expect(out.manifest.readinessPolicyVersion).toBe('checkpoint-v1');});
 });
 describe('one structured provider request, independent pedagogy checks',()=>{
- const reply='可以先填一小句：这个任务要我___。你想怎样说？';
+ const reply='你已经说出了这次任务大概要做什么。这一步已经够用了。你想进入下一阶段还是留下多想一点？';
  beforeEach(()=>{vi.stubEnv('DEEPSEEK_API_KEY','not-a-real-test-key');vi.stubGlobal('fetch',vi.fn());});
  afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
  function output(content:string){vi.mocked(fetch).mockResolvedValue(Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content}}]}));}

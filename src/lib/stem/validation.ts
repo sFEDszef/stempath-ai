@@ -23,6 +23,7 @@ export function parseArtifacts(input:unknown): LearningArtifacts {
 export function parseChatRequest(input:unknown):ChatRequest {
  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Invalid request');
  const v=input as Record<string,unknown>;
+ if(v.stageReady!==undefined&&typeof v.stageReady!=='boolean')throw Error('Invalid conversation mode');
  for(const k of ['interfaceLanguage','taskLanguage'])if(v[k]!==undefined&&!['zh-CN','en'].includes(v[k] as string))throw Error('Invalid language');
  const text=(x:unknown,max:number):x is string=>typeof x==='string'&&x.trim().length>0&&x.length<=max;
  if(!stageIds.includes(v.stage as StageId)||![1,2,3].includes(v.level as number)||!text(v.message,MAX_TEXT)||!Array.isArray(v.history)||v.history.length>MAX_HISTORY)throw new Error('Invalid request');
@@ -32,5 +33,5 @@ export function parseChatRequest(input:unknown):ChatRequest {
  if(v.intent!==undefined&&!['chat','challenge','evaluate-claim','support-change'].includes(v.intent as string))throw new Error('Invalid intent');
  if(v.previousLevel!==undefined&&(![1,2,3].includes(v.previousLevel as number)||v.intent!=='support-change'))throw new Error('Invalid previous level');
  if(v.claim!==undefined&&!text(v.claim,4000))throw new Error('Invalid claim');
- return {interfaceLanguage:v.interfaceLanguage as ChatRequest["interfaceLanguage"],taskLanguage:v.taskLanguage as ChatRequest["taskLanguage"],...(v.previousLevel===undefined?{}:{previousLevel:v.previousLevel as ChatRequest['level']}),research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
+ return {stageReady:v.stageReady as boolean|undefined,interfaceLanguage:v.interfaceLanguage as ChatRequest["interfaceLanguage"],taskLanguage:v.taskLanguage as ChatRequest["taskLanguage"],...(v.previousLevel===undefined?{}:{previousLevel:v.previousLevel as ChatRequest['level']}),research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
 }

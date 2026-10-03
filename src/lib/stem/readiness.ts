@@ -1,5 +1,6 @@
 import type {ChatRequest,LearningArtifacts,StageId,STEMTask,Message} from '@/types';
 import {stageCheckpoints} from './stageCheckpoints';
+import {contribution} from './conversationProgress';
 export const READINESS_POLICY_VERSION='gentle-v1' as const;
 export const readinessCriteria={understand:'BASIC_TASK_GOAL',imagine:'ONE_IDEA',plan:'ONE_ACTIONABLE_NEXT_STEP',build:'ACTUAL_ATTEMPT',test:'ACTUAL_RESULT',improve:'ONE_REVISION',reflect:'ONE_TAKEAWAY'} as const;
 export type ReadinessCriterion=typeof readinessCriteria[StageId];
@@ -7,7 +8,7 @@ export interface StageReadinessAssessment {ready:boolean;criterion?:ReadinessCri
 export type StageReadiness=Partial<Record<StageId,StageReadinessAssessment>>;
 const trivial=/^(?:好的?|嗯+|不知道|不懂|没懂|不确定|随便|下一步|继续|ok(?:ay)?|yes|no|idk|thanks|thank you|not sure|i don['’]?t (?:know|understand))[。.!?？\s]*$/i;
 function learnerText(text:string){return text.replace(/^Regarding this unverified claim: “[^]*?”\n\n/,'');}
-export function meaningfulEvidence(text:string){return text.trim().length>=2&&/[\p{L}\p{N}]/u.test(text)&&!/^[_?？.。\s]+$/.test(text)&&!trivial.test(text.trim())&&!/^(?:我)?(?:还是|仍然|真的|完全|还)?(?:不知道|不懂|没懂|不确定|don['’]?t know|not sure|i don['’]?t know)(?:从哪|怎么|从哪里|该|如何|where|what)?[^,，;；。]*[。.!?？]*$/i.test(text.trim())&&!/ignore.*instructions|忽略.*指令|mark.*ready|设.*ready/i.test(text);}
+export function meaningfulEvidence(text:string){return !/^(?:我(?:可以|该)?(?:怎样|怎么)(?:描述|说明|表达|说出)|How (?:can|should) I (?:describe|explain|express|share))/i.test(text.trim())&&text.trim().length>=2&&/[\p{L}\p{N}]/u.test(text)&&!/^[_?？.。\s]+$/.test(text)&&!trivial.test(text.trim())&&!/^(?:我)?(?:还是|仍然|真的|完全|还)?(?:不知道|不懂|没懂|不确定|don['’]?t know|not sure|i don['’]?t know)(?:从哪|怎么|从哪里|该|如何|where|what)?[^,，;；。]*[。.!?？]*$/i.test(text.trim())&&!/ignore.*instructions|忽略.*指令|mark.*ready|设.*ready/i.test(text);}
 /** Narrow, directly dangerous actions only. No general safety checklist or mastery score. */
 export function unsafeAction(task:STEMTask,text:string){return /触摸带电|(?:touch|connect).*?(?:mains|live wire)|混合漂白|mix.*bleach.*ammonia/i.test(text)||(/不能饮用|not.*drink|do not drink/i.test([task.safetyNotes,...task.constraints??[],task.description].join(' '))&&/(?:我要|准备|想|will|going to).*?(?:喝|drink)/i.test(text));}
 function temporalEvidence(stage:StageId,text:string){
@@ -30,7 +31,8 @@ export function assessLocalReadiness(task:STEMTask,stage:StageId,records:Learnin
  const fields=stageCheckpoints(task,stage).filter(c=>c.core);
  const relevant=stage==='understand'?fields:stage==='improve'?fields:fields.slice(0,1);
  const recordReady=relevant.some(c=>evidenceForStage(task,stage,records[stage]?.[c.field]??'',true));
- const ready=recordReady||messages.some(m=>m.role==='student'&&evidenceForStage(task,stage,learnerText(m.text)));
+ let previous='';
+ const ready=recordReady||messages.some(m=>{if(m.role==='assistant'){previous=m.text;return false;}return contribution({task,stage},learnerText(m.text),previous)[0];});
  return ready?{ready:true,criterion:readinessCriteria[stage],source:recordReady?'LOCAL_RECORD':source}:{ready:false,missing:readinessCriteria[stage],source};
 }
 export function requestReadiness(r:ChatRequest,source:StageReadinessAssessment['source']='DEMO'){
