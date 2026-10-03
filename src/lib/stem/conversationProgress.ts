@@ -12,7 +12,7 @@ const primaryQuestions:Record<StageId,RegExp>={
  understand:/要.*做什么|任务.*(?:动作|做的事|目标)|task.*(?:ask|goal)|which action/i,
  imagine:/什么.*(?:办法|猜想)|一个.*(?:想法|办法)|one.*(?:idea|guess)|what.*idea/i,
  plan:/先.*(?:做|步)|准备.*做|first|action.*step/i,
- build:/做了哪|试过|具体做|亲手|实际.*做|which step|what.*(?:tried|try yourself|did you do)/i,
+ build:/做了哪|试过|具体做|亲手|实际.*做|装好|改好|which step|what.*(?:tried|try yourself|did you do)|already.*(?:attach|install|finish)/i,
  test:/测到|测得|看到.*结果|实际.*(?:看到|结果)|actual.*(?:result|see|measure)|what did.*(?:see|measure)/i,
  improve:/哪里.*改|哪.*(?:值得|想).*改|one.*(?:worth changing|change)|what.*changing/i,
  reflect:/学会|学到|变化的想法|what.*learn|idea.*changed/i
@@ -47,7 +47,7 @@ export function contribution(request:Pick<ChatRequest,'task'|'stage'>,text:strin
  let second=secondaryEvidence[request.stage].test(text);
  // Short contextual answers count, but plans/predictions never become actual attempts/results.
  const actual=request.stage==='build'||request.stage==='test';
- const invalidActual=actual&&prospective.test(text);
+ const invalidActual=actual&&(prospective.test(text)||(!first&&dialogueContribution(request.stage,text,previous).futureIntent));
  if(invalidActual)second=false;
  if(target===0&&!first&&!invalidActual){
   const contextual=actual?/装.*(?:了|去)|换.*了|试.*次|\b(?:installed|attached|tried|did|measured)\b/i.test(text):
@@ -60,6 +60,23 @@ export function contribution(request:Pick<ChatRequest,'task'|'stage'>,text:strin
  }
  return [first,second];
 }
+/** Interpret choices only against the coach's last question; never grant readiness. */
+export function answeredChoice(text:string,previous:string):boolean{
+ if((!meaningfulEvidence(text)&&!/[ABC]/i.test(text.trim()))||isConfused(text)||text.trim().length>80)return false;
+ const q=previous.match(/[^。.!！\n]*[?？]/g)?.at(-1)??previous;
+ if(!/还是|或者|或是|\bor\b|[ABC][.)、]/i.test(q))return false;
+ const answer=text.replace(/[\p{P}\p{S}\s]/gu,'').replace(/^(?:我想|我要|我选|选择|选|I choose |I pick )/i,'').replace(/一点$/,'');
+ return answer.length>=1&&q.replace(/[\p{P}\p{S}\s]/gu,'').toLowerCase().includes(answer.toLowerCase());
+}
+export function dialogueContribution(stage:StageId,text:string,previous:string){
+ const choice=answeredChoice(text,previous);
+ const actual=evidenceForStage({id:'context',title:'',description:'',type:'general-stem'},stage,text);
+ const physical=stage==='build'||stage==='test';
+ const notDone=physical&&/^(?:我)?(?:还没(?:有)?(?:开始|动手|试过|做过|测过|测试)?|没(?:有)?(?:开始|动手|试过|做过|测过)?|not yet|no|I haven['’]?t(?: started| tried| tested)?(?: yet)?)[。.!！\s]*$/i.test(text.trim());
+ const futureIntent=physical&&!actual&&!notDone&&!isConfused(text)&&(/我(?:想|要)|打算|准备|加高|加宽|\b(?:want to|going to|plan to|will|would)\b/i.test(text)||choice);
+ const prediction=stage==='test'&&!actual&&/我(?:觉得|猜)|应该|可能会|预测|预计|\b(?:predict|might|think.*(?:will|would|go|run|travel))\b/i.test(text);
+ return {choice,futureIntent,prediction,notDone};
+}
 export function conversationProgress(request:ChatRequest){
  const slots:[boolean,boolean]=[false,false];
  const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core);
@@ -69,33 +86,42 @@ export function conversationProgress(request:ChatRequest){
   else slots[1]=meaningfulEvidence(text)&&!isConfused(text)&&!unsafeAction(request.task,text);
  }
  let previous='';let latest:[boolean,boolean]=[false,false];
+ let choiceAnswer='',futureIntent=false,prediction=false,notDone=false;
  const turns=[...request.history,...(!request.intent||request.intent==='chat'?[{role:'student' as const,text:request.message}]:[])];
  for(const turn of turns){
   if(turn.role==='assistant'){previous=turn.text;continue;}
+  const memory=dialogueContribution(request.stage,turn.text,previous);
+  if(memory.choice)choiceAnswer=turn.text.slice(0,80);
+  futureIntent ||= memory.futureIntent;prediction ||= memory.prediction;notDone=memory.notDone;
   latest=contribution(request,turn.text,previous);
   slots[0] ||= latest[0];slots[1] ||= latest[1];
  }
  const ready=slots[0]||assessLocalReadiness(request.task,request.stage,request.artifacts).ready;
  const target:0|1|2=!slots[0]?0:!slots[1]?1:2;
- return {slots,ready,target,latest,confused:isConfused(request.message)};
+ return {slots,ready,target,latest,choiceAnswer,futureIntent,prediction,notDone,confused:isConfused(request.message)};
 }
 /** Keep witnesses for each slot plus recent turns within the existing request limit.
  * Derived every time from the full saved stage conversation; no new persisted state or text copies.
  */
 export function conversationHistory(request:Pick<ChatRequest,'task'|'stage'>,messages:Pick<Message,'role'|'text'>[]){
- const indexes=new Set<number>();const found=[false,false];let previous='';
+ const indexes=new Set<number>();const found=[false,false];let previous='';let intentWitness=-1;
  for(const [index,turn] of messages.entries()){
   if(turn.role==='assistant'){previous=turn.text;continue;}
+  const memory=dialogueContribution(request.stage,turn.text,previous);
+  if(memory.choice||memory.futureIntent||memory.prediction)intentWitness=index;
   const evidence=contribution(request,turn.text,previous);
   for(const slot of [0,1])if(evidence[slot]&&!found[slot]){found[slot]=true;indexes.add(index);if(index>0&&messages[index-1].role==='assistant')indexes.add(index-1);}
  }
- for(let index=Math.max(0,messages.length-8);index<messages.length;index++)indexes.add(index);
+ if(intentWitness>=0){indexes.add(intentWitness);if(intentWitness>0&&messages[intentWitness-1].role==='assistant')indexes.add(intentWitness-1);}
+ for(let index=Math.max(0,messages.length-6);index<messages.length;index++)indexes.add(index);
  return [...indexes].sort((a,b)=>a-b).map(index=>({role:messages[index].role,text:messages[index].text.slice(0,2000)}));
 }
 function normalize(text:string){return text.toLowerCase().replace(/___|[\p{P}\p{S}\s]/gu,'').replace(/可以先填一小句|换个简单说法|我们只想一小步|tryonesmallsentence|letssayitmoresimply/g,'');}
 export function repeatsAnsweredQuestion(text:string,request:ChatRequest){
  if(request.intent==='challenge'||request.intent==='evaluate-claim')return false;
- const progress=conversationProgress(request),target=questionTarget(request.stage,text);
+ const progress=conversationProgress(request);
+ if(progress.choiceAnswer&&(answeredChoice(progress.choiceAnswer,text)||(/还是|\bor\b|A[.)、][\s\S]*B[.)、]/i.test(text)&&normalize(text).includes(normalize(progress.choiceAnswer)))))return true;
+ const target=questionTarget(request.stage,text);
  if(!progress.confused&&target!==undefined&&progress.slots[target])return true;
  const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core);
  if(!progress.confused&&core.some((field,index)=>progress.slots[index]&&text.includes('___')&&(normalize(text).includes(normalize(field.zh))||normalize(text).includes(normalize(field.en)))))return true;

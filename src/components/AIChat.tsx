@@ -110,8 +110,6 @@ export function AIChat({
             key={message.id}
             researchVisible={researchVisible}
             message={message}
-            onReply={onSend}
-            disabled={busy||coachDisabled}
           />
         ))}
         {!coachDisabled&&busy && (

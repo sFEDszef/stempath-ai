@@ -4,7 +4,6 @@ import { respond } from '@/lib/ai';
 import { demoProvider } from '@/lib/ai/demoProvider';
 import { ProviderError,diagnostics,release } from '@/lib/ai/provider';
 import { decidePedagogicalAction } from '@/lib/pedagogy/decisionEngine';
-import { suggestedReplies } from '@/lib/pedagogy/responses';
 import { MAX_BODY_BYTES, parseChatRequest } from './validation';
 import type { ChatRequest } from '@/types';
 export type GenerateReply = (request: ChatRequest) => Promise<string>;
@@ -34,7 +33,7 @@ export async function handleChat(req: Request, generate?: GenerateReply): Promis
   if(request.mode==='demo')return reply(demoProvider(request));
   try {
     // Optional dependency injection supports boundary tests; production always uses the provider layer.
-    if(generate)return reply({text:await generate(request),suggestions:request.intent==='challenge'?[]:suggestedReplies(decidePedagogicalAction(request).state.language),mode:'ai'});
+    if(generate)return reply({text:await generate(request),suggestions:[],mode:'ai'});
     return reply(await respond(request));
   } catch(error) {
     const code=error instanceof ProviderError?error.code:'upstream';

@@ -113,3 +113,17 @@ describe('authenticated coach boundary without paid calls',()=>{
  it('blocks NO_AI even if the client forges a different condition',async()=>{await projects.assign(admin,a.id,demoTasks[0],conditionConfig('NO_AI'));const p=await projects.create(a,demoTasks[0],'ASSIGNED'),login=await accounts.login('P001','482196','deviceA'),handler=vi.fn();expect((await guardedCoach(request('chat','POST',body(p.id),login.token),handler,false,db)).status).toBe(403);expect(handler).not.toHaveBeenCalled();});
  it('requires a researcher for task-check calls',async()=>{const login=await accounts.login('P001','482196','deviceA'),handler=vi.fn();expect((await guardedCoach(request('task-check','POST',{task:demoTasks[0]},login.token),handler,true,db)).status).toBe(403);expect(handler).not.toHaveBeenCalled();});
 });
+
+describe('saved completion ceremony state',()=>{
+ it('POSTGRES saves the once flag atomically with all seven stages and survives a fresh device',async()=>{
+  let p=await projects.create(a,demoTasks[0],'OPEN');
+  const evidence=['让小车跑起来','我想把帆加大','先装上帆','我已经装好了帆','跑了2.3米','我想把轮子调直','我发现实际测试很重要'];
+  for(const [i,stage] of stageIds.entries())p.records[stage]={[stageCheckpoints(p.task,stage).filter(c=>c.core)[0].field]:evidence[i]};
+  p.completed=[...stageIds];p.active='reflect';p.completionCelebrationSeen=true;
+  p=await projects.save(a,p.id,p,p.serverVersion);expect(p.completionCelebrationSeen).toBe(true);
+  const fresh=await new Projects(db).get(a,p.id);expect(fresh.completed).toHaveLength(7);expect(fresh.completionCelebrationSeen).toBe(true);
+  fresh.completionCelebrationSeen=false;expect((await projects.save(a,p.id,fresh,fresh.serverVersion)).completionCelebrationSeen).toBe(true);
+  expect((await db.query('SELECT status FROM projects WHERE id=$1',[p.id]))[0].status).toBe('COMPLETED');
+ });
+ it('an incomplete project cannot save a false completion celebration',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN');p.completionCelebrationSeen=true;expect((await projects.save(a,p.id,p,p.serverVersion)).completionCelebrationSeen).toBe(false);});
+});

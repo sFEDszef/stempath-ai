@@ -21,7 +21,7 @@ function related(task:STEMTask,text:string){const words=[task.title,task.descrip
 export function evidenceForStage(task:STEMTask,stage:StageId,text:string,record=false):boolean{
  if((stage==='build'||stage==='test')&&/[,，;；。.!]/.test(text)){const clauses=text.split(/[,，;；。!]|\.(?!\d)/).filter(x=>x.trim());if(clauses.length>1)return !unsafeAction(task,text)&&clauses.some(x=>evidenceForStage(task,stage,x,record));}
  if(!meaningfulEvidence(text)||unsafeAction(task,text)||!temporalEvidence(stage,text))return false;
- if(stage==='test')return /\d+(?:\.\d+)?\s*(?:米|m\b|cm|毫米|秒|s\b|度|°|克|g\b)|跑了|倒了|看到|测到|测得|比.*(?:远|快|高|低)|went|fell|observed|measured|was|rose|this time|result/i.test(text)||(record&&/\d/.test(text));
+ if(stage==='test')return /\d+(?:\.\d+)?\s*(?:米|m\b|met(?:re|er)s?\b|cm|centimet(?:re|er)s?\b|毫米|秒|seconds?\b|s\b|度|°|克|grams?\b|g\b)|跑了|走了|动了|停了|倒了|看到|测到|测得|比.*(?:远|快|高|低)|went|fell|observed|measured|was|rose|this time|result/i.test(text)||(record&&/\d/.test(text));
  if(stage==='build')return /已经|刚刚|试了|装.*了|换.*了|做了|搭.*了|推了|tested|tried|built|changed|set up|installed|attached|made|did|have.*(?:done|tried)/i.test(text);
  if(record)return true;
  if(!related(task,text))return false;
@@ -47,6 +47,7 @@ export function parseReadiness(value:unknown,stage:StageId,source:StageReadiness
 export function semanticReadiness(value:unknown,r:ChatRequest){
  const a=parseReadiness(value,r.stage,'AI_SEMANTIC');if(!a)return requestReadiness(r);
  const student=[...r.history.filter(m=>m.role==='student').map(m=>learnerText(m.text)),...(!r.intent||r.intent==='chat'?[r.message]:[]),...Object.values(r.artifacts[r.stage]??{})];
+ if(a.ready&&(r.stage==='build'||r.stage==='test')&&!requestReadiness(r).ready&&student.every(t=>!evidenceForStage(r.task,r.stage,t)))return requestReadiness(r);
  if(a.ready&&!student.some(t=>meaningfulEvidence(t)&&t.split(/[,，;；。!]|\.(?!\d)/).some(c=>meaningfulEvidence(c)&&temporalEvidence(r.stage,c))&&!unsafeAction(r.task,t)))return requestReadiness(r);
  if(student.some(t=>unsafeAction(r.task,t)))return {ready:false,missing:readinessCriteria[r.stage],source:'AI_SEMANTIC' as const};
  return a;

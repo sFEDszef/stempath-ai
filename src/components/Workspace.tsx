@@ -13,6 +13,8 @@ import { STEMJourney } from "./STEMJourney";
 import { ArtifactUploader } from "./ArtifactUploader";
 import { HelpMeter } from "./HelpMeter";
 import {useI18n} from "@/lib/i18n";
+import {ProjectCompletionModal} from "./ProjectCompletionModal";
+import {shouldCelebrate} from "@/lib/projects/completion";
 import {ReadyTransitionModal} from "./ReadyTransitionModal";
 import {shouldPromptReady} from "@/lib/stem/readyPrompt";
 import {StageCheckpoint} from "./StageCheckpoint";
@@ -30,12 +32,11 @@ import type { ResearchController } from "@/lib/research/useResearchSession";
 import { conditionConfig, initialLevel, aiEnabled, type ResearchConfig } from "@/lib/research/config";
 import { type Choice } from "@/lib/research/session";
 import { decidePedagogicalAction } from "@/lib/pedagogy/decisionEngine";
-import { suggestedReplies } from "@/lib/pedagogy/responses";
 import { SupportRecommendation } from "./SupportRecommendation";
 import { AIChallenge } from "./AIChallenge";
 import { CoachError } from "@/lib/coach";
 import type { Artifact, Message, StageId, SupportLevel, ChatRequest, STEMTask, LearningArtifacts as Thinking } from "@/types";
-export default function Workspace({task,initialProject,saveStatus,onSaveRetry,onProgress,onNavigate,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{initialProject:Project;saveStatus:"saved"|"saving"|"failed";onSaveRetry:()=>void;onProgress:(p:ProjectProgress)=>void;onNavigate:(name:string)=>void;task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
+export default function Workspace({task,initialProject,saveStatus,onSaveRetry,onProgress,onPersistCompletion,onNavigate,onLoadTask,research,researchVisible,onResearchReset,onResearchClear,onAssignTask,onHideResearch}:{initialProject:Project;saveStatus:"saved"|"saving"|"failed";onSaveRetry:()=>void;onProgress:(p:ProjectProgress)=>void;onPersistCompletion:(p:ProjectProgress)=>Promise<boolean>;onNavigate:(name:string)=>void;task:STEMTask;onLoadTask:()=>void;research:ResearchController;researchVisible:boolean;onResearchReset:(config:ResearchConfig,task?:STEMTask)=>void;onResearchClear:(all:boolean)=>void;onAssignTask:(task:STEMTask)=>void;onHideResearch:()=>void}) {
   const {t,locale}=useI18n();
   const config=research.session?.config??conditionConfig();
   const coachEnabled=aiEnabled(config),finished=!!research.session?.completedAt;
@@ -48,6 +49,10 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const stages=getStages(task).map(s=>({...s,title:primary?(locale==="zh-CN"&&s.id==="build"&&/inquiry|investigation/.test(task.type)?"开始探究":childStageNames[s.id][locale==="zh-CN"?0:1]):locale==="zh-CN"?t(`stage.${s.id}`):s.title,description:primary?({understand:["任务要做什么","Find the goal"],imagine:["想一个办法","Think of an idea"],plan:["准备怎么做","Plan a small step"],build:["亲手试一试","Try your plan"],test:["看看结果","Look at the result"],improve:["试着改一点","Try a small change"],reflect:["说说学到了什么","Share what you learned"]}[s.id][locale==="zh-CN"?0:1]):t(s.description),question:primary?youngQuestion({task,stage:s.id,level:1,message:"",history:[],artifacts:{},completed:[]},locale==="zh-CN"):t(s.question)}));
   const [readiness,setReadiness]=useState(initialProject.readiness);
   const readinessRef=useRef(initialProject.readiness);
+  const [completionCelebrationSeen,setCompletionCelebrationSeen]=useState(initialProject.completionCelebrationSeen);
+  const [celebrating,setCelebrating]=useState(false);
+  const [completionSaving,setCompletionSaving]=useState(false);
+  const completionRetry=useRef<ProjectProgress|null>(null);
   const [readyPrompt,setReadyPrompt]=useState<StageId|null>(null);
   const activeRef=useRef(initialProject.active);
   const [readyDismissed,setReadyDismissed]=useState<Partial<Record<StageId,boolean>>>({});
@@ -77,7 +82,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
-  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:suggestedReplies(locale==='zh-CN'?'zh':'en',{task,stage:active,level,message:'',history:[],artifacts:records,completed})}];
+  const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:[]}];
   const adaptiveRequest:ChatRequest={stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:conversationHistory({task,stage:active},messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
@@ -106,15 +111,31 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   },[task,active,records]);
   const safetyBlocked=[...Object.values(records[active]??{}),conversations[active]?.filter(m=>m.role==='student').at(-1)?.text??''].some(text=>unsafeAction(task,text));
   const canContinue=(!safetyBlocked&&!!readiness[active]?.ready)||completed.includes(active);
+  async function persistFinal(state:ProjectProgress){
+    setCompletionSaving(true);
+    completionRetry.current=state;
+    const saved=await onPersistCompletion(state);
+    if(!alive.current)return;
+    setCompletionSaving(false);
+    if(shouldCelebrate({...state,completionCelebrationSeen:false},!!research.current.current?.completedAt,saved)){
+      completionRetry.current=null;setCelebrating(true);
+    }
+  }
   function completeStage(force=false){
-    if(finished||pendingRef.current.size||research.busy)return false;
+    if(finished||completionSaving||pendingRef.current.size||research.busy)return false;
     if(safetyBlocked&&!completed.includes(active)){setCompletionWarning([locale==='zh-CN'?'先停下这个不安全的动作，请和老师确认安全的做法。':'Pause the unsafe action and check a safe approach with your teacher.']);return false;}
     const missing=!canContinue;
     if(!completed.includes(active)&&missing&&!(force&&researchVisible)){setCompletionWarning([locale==='zh-CN'?missingCue[active][0]:missingCue[active][1]]);return false;}
     if(force&&researchVisible&&missing)research.event('STAGE_OVERRIDE',{systemAction:'TEACHER_FORCE_CONTINUE'});
     if(!completed.includes(active)){setCompleted(prev=>[...prev,active]);research.complete(active,true);}
     setCompletionWarning([]);const next=nextStage(active);
-    if(next)enterStage(next);else {research.finish();focusWorkspace();}
+    if(next)enterStage(next);else {
+      const done=[...new Set([...completed,active])];
+      if(done.length===7){research.finish();
+        if(!completionCelebrationSeen){setCompletionCelebrationSeen(true);void persistFinal({readiness,records,completed:done,active,level,conversations,notebook:note,challenges,completionCelebrationSeen:true});}
+      }
+      focusWorkspace();
+    }
     return true;
   }
   function focusWorkspace(){requestAnimationFrame(()=>{const el=document.getElementById('main');el?.focus();el?.scrollIntoView({behavior:'smooth'});});}
@@ -152,7 +173,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   // TaskWorkspace remounts this workspace for every loaded task.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  useEffect(()=>{if(restored)onProgress({readiness,records,completed,active,level,conversations,notebook:note,challenges});},[readiness,records,completed,active,level,conversations,note,challenges,restored,onProgress]);
+  useEffect(()=>{if(restored)onProgress({readiness,records,completed,active,level,conversations,notebook:note,challenges,completionCelebrationSeen});},[readiness,records,completed,active,level,conversations,note,challenges,completionCelebrationSeen,restored,onProgress]);
   useEffect(() => {
     if (modal) dialog.current?.showModal();
     else dialog.current?.close();
@@ -174,7 +195,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
                 id: crypto.randomUUID(),
                 role: "assistant",
                 text: `${task.title} · ${stages.find(s=>s.id===id)!.title}。${youngReply({...adaptiveRequest,stage:id,stageReady:!!readiness[id]?.ready,history:[],message:""},locale==='zh-CN')}`,
-                suggestions: suggestedReplies(locale==='zh-CN'?'zh':'en',{...adaptiveRequest,stage:id,stageReady:!!readiness[id]?.ready,history:[],message:''}),
+                suggestions: [],
               },
             ],
           },
@@ -249,6 +270,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
     <>
       <a href="#main" className="skip-link">{t("Skip to learning workspace")}</a>
       <Header onNavigate={navigate} />
+      {celebrating&&<ProjectCompletionModal zh={locale==='zh-CN'} onClose={action=>{setCelebrating(false);if(action==='PROJECT')onNavigate('My Projects');else focusWorkspace();}}/>}
       {readyPrompt&&<ReadyTransitionModal final={readyPrompt==='reflect'} zh={locale==='zh-CN'} disabled={pending.length>0||research.busy||safetyBlocked} onDecision={readyDecision}/>}
       <div className="workspace-shell">
         <ProgressSidebar
@@ -266,13 +288,13 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
             <span>{task.title}</span><button onClick={onLoadTask}>{t("Load STEM Challenge")}</button>
           </div>
           <ChallengeCard task={task} />
-          <p className="save-status" role="status">{t(saveStatus==='saved'?'Saved':saveStatus==='saving'?'Saving…':'Save failed')}{saveStatus==='failed'&&<button onClick={onSaveRetry}>{t('Retry saving')}</button>}</p>
+          <p className="save-status" role="status">{t(saveStatus==='saved'?'Saved':saveStatus==='saving'?'Saving…':'Save failed')}{saveStatus==='failed'&&<button onClick={()=>{if(completionRetry.current)void persistFinal(completionRetry.current);else onSaveRetry();}}>{t('Retry saving')}</button>}</p>
           {coachEnabled&&researchVisible&&<div className="coach-mode"><label>{t("Coach mode")}<select aria-label={t("Coach mode")} value={mode} onChange={e=>{research.event('CONFIG_CHANGED',{systemAction:'MODE_'+e.target.value.toUpperCase()});setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">{t("Auto · AI when available")}</option><option value="deepseek">{t("DeepSeek · real AI only")}</option><option value="demo">{t("Demo · local practice")}</option></select></label><span>{responseMode==='demo'?t("Demo response · local guidance"):responseMode==='ai'?t("DeepSeek · real AI response"):mode==='deepseek'?t("DeepSeek only · errors allow retry."):t("Practice with Demo when AI is unavailable.")}</span></div>}
           {canContinue&&!completed.includes(active)&&!readyDismissed[active]&&<section className="rail-section checkpoint-ready" role="status"><p>{locale==='zh-CN'?'这一步已经够用了，可以进入下一步啦！':'You have enough to continue to the next step.'}</p><p>{readinessCopy[active][locale==='zh-CN'?0:1]}</p><button onClick={()=>setReadyDismissed(prev=>({...prev,[active]:true}))}>{locale==='zh-CN'?'我还想再想一想':'I want to think some more'}</button></section>}
           <AIChat
             researchVisible={researchVisible}
             recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={{...adaptive.decision,state:{...adaptive.decision.state,language:locale==='zh-CN'?'zh':'en'}}} onChoice={chooseSupport} disabled={(pending.length>0||research.busy)}/>:undefined}
-            coachDisabled={!coachEnabled||finished}
+            coachDisabled={!coachEnabled||finished||completionSaving}
             supportDisabled={!manualSupport||(pending.length>0||research.busy)}
             sessionFinished={finished}
             mode={responseMode??(mode==="auto"?undefined:mode)}

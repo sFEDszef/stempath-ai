@@ -1,37 +1,12 @@
 import {useI18n} from '@/lib/i18n';
 import { Sparkles, UserRound } from "lucide-react";
 import type { Message } from "@/types";
-export function SuggestedReplies({
-  replies,
-  onReply,
-  disabled,
-}: {
-  replies: string[];
-  onReply: (text: string) => void;
-  disabled: boolean;
-}) {
-
-
-  return (
-    <div className="suggested-replies">
-      {replies.map((reply) => (
-        <button disabled={disabled} onClick={() => onReply(reply)} key={reply}>
-          {reply}
-        </button>
-      ))}
-    </div>
-  );
-}
 export function ChatMessage({
   researchVisible=false,
   message,
-  onReply,
-  disabled,
 }: {
   researchVisible?:boolean;
   message: Message;
-  onReply: (text: string) => void;
-  disabled: boolean;
 }) {
  const {t}=useI18n();
 
@@ -49,13 +24,7 @@ export function ChatMessage({
         >
           {message.text}
         </div>
-        {message.suggestions && (
-          <SuggestedReplies
-            replies={message.suggestions}
-            onReply={onReply}
-            disabled={disabled}
-          />
-        )}
+
       </div>
     </article>
   );
