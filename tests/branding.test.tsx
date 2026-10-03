@@ -7,9 +7,10 @@ import {Footer} from '@/components/Footer';
 import {translate} from '@/lib/i18n';
 
 describe('v0.6.1 public branding',()=>{
- it('renders the supplied artwork instead of a Sprout brand icon',()=>{
+ it('renders the current official artwork instead of previous header icons',()=>{
   const html=renderToStaticMarkup(<Header onNavigate={()=>{}}/>);
-  expect(html).toContain('tequila-sunset-logo-original.jpg');
+  expect(html).toContain('stempath-256e7993ff86-192.png');
+  expect(html).not.toContain('tequila-sunset-logo-original.jpg');
   expect(html).toContain('STEMPath AI logo');
   expect(html).not.toContain('<svg');
  });
@@ -29,7 +30,7 @@ describe('v0.6.1 public branding',()=>{
   expect(translate('Original Work & Maintenance Statement','zh-CN')).toBe('原创与维护声明');
   expect(translate('Unless explicitly stated otherwise, STEMPath AI currently has no other co-creators or co-maintainers.','zh-CN')).toContain('不设其他共同创建者或共同维护者');
  });
- it('preserves header artwork and attribution while shipping versioned website icons',()=>{
+ it('preserves archived artwork and attribution while shipping versioned website icons',()=>{
   const bytes=readFileSync('public/brand/tequila-sunset-logo-original.jpg');
   expect([...bytes.subarray(0,3)]).toEqual([255,216,255]);
   const layout=readFileSync('src/app/layout.tsx','utf8');
