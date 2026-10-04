@@ -11,6 +11,15 @@ export function rubricQuestion(request:ChatRequest,zh:boolean){
  let q=missing?cues[missing.kind][zh?0:1]:deepening[Math.max(0,round-1)%deepening.length];
  if(/不知道|不懂|don['’]?t.*(?:know|understand)|not sure|不确定/i.test(request.message)&&missing?.kind==='TASK_GOAL')q=zh?'题目里哪个动作词告诉你要做什么？':'Which action word in the task tells you what to do?';
  const recent=request.history.filter(m=>m.role==='assistant').slice(-5).map(m=>m.text);
- if(recent.some(t=>t.includes(q))){const label=missing?.label.split(' / ')[zh?1:0]??missing?.label;const alternatives=zh?[`说说你刚才提到的“${label??'想法'}”，还有哪一点需要解释？`,'你能用自己的一个小例子说明这一点吗？','关于这一点，你现在会怎样说？']:[`What would you add about “${label??'your idea'}”?`,'Can you explain that with a small example of your own?','How would you describe that part now?'];q=alternatives.find(x=>!recent.some(t=>t.includes(x)))??q;}
+ if(recent.some(t=>t.includes(q))){
+  const alternatives=missing?.kind==='ACTUAL_TRIAL_2'
+   ?zh?['目前说清楚的是第一次结果。等你实际再试一次，告诉我第二次测到或看到什么。','第二次真实尝试的结果还没有记下来。你可以先去试，回来再说第二次的观察。','重复第一次的结果不能代替另一次尝试。实际完成第二次后，你测到或看到什么？']
+      :['We have the first result. After you actually try again, tell me what you measured or observed on the second trial.','The second real trial is not recorded yet. You can try it first, then return with your second observation.','Repeating the first result is not another trial. After completing a second real trial, what did you measure or observe?']
+   :missing
+    ?zh?[`先补上这一小点：${q}`,`我们仍需要这个实际信息：${q}`,`换个角度继续想这一个问题：${q}`]
+       :[`Let’s add this missing part: ${q}`,`We still need this information: ${q}`,`Let’s approach this one question again: ${q}`]
+    :deepening.filter(x=>x!==q);
+  q=alternatives.find(x=>!recent.some(t=>t.includes(x)))??q;
+ }
  return q;
 }

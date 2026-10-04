@@ -8,6 +8,7 @@ import {stageIds} from '@/lib/stem/stages';
 import {newProject,parseProject} from '@/lib/projects/storage';
 import {reviseTask} from '@/lib/research/traceability';
 import {defaultRubric} from '@/lib/stem/rubrics';
+import {rubricQuestion} from '@/lib/stem/rubricCoaching';
 import {startSession,recordEvent} from '@/lib/research/session';
 import {conditionConfig} from '@/lib/research/config';
 import {exportJSON,exportCSV} from '@/lib/research/export';
@@ -71,6 +72,28 @@ describe('frozen per-task rubrics and migration',()=>{
  it('research OFF exports only numerical verdict metadata, never learner text',()=>{let s=startSession(task,conditionConfig());s=recordEvent(s,'STAGE_READY',{ready:true,reasonCategory:'TASK_STAGE_RUBRIC',systemAction:'SEMANTIC_MINIMUM_EVIDENCE',readinessSource:'DEMO',meaningfulRounds:5,requiredRounds:5,criteriaSatisfiedCount:3,criteriaRequiredCount:3,readinessPolicyVersion:READINESS_POLICY_VERSION,taskRevision:2,messageText:'PRIVATE LEARNER TEXT'});for(const raw of [exportJSON(s),exportCSV(s)]){expect(raw).not.toContain('PRIVATE LEARNER TEXT');expect(raw).toContain('task-rubric-v1');expect(raw).toContain('meaningfulRounds');}});
 });
 describe('same-request semantic classification and natural coaching',()=>{
+ it.each([1,2,3] as const)('keeps the missing second real trial explicit after repeated prompts at level %s',level=>{
+  const r={...rubricRequest('test',task,Array(5).fill('第一次实际测到小车跑了2.1米，还没达到3米。')),level};
+  for(const zh of [true,false]){
+   const prompts:string[]=[];
+   for(let i=0;i<4;i++){
+    const question=rubricQuestion({...r,history:prompts.map(text=>({role:'assistant' as const,text}))},zh);
+    expect(question).toMatch(zh?/第二次/:/second/i);
+    expect(question).toMatch(zh?/实际|真实/:/actual|real/i);
+    prompts.push(question);
+   }
+   expect(new Set(prompts).size).toBe(4);
+  }
+ });
+ it('varied prompts continue targeting the missing goal instead of generic examples',()=>{
+  const r=rubricRequest('understand',task,Array(5).fill('要做一个用风走的小车，用老师给的材料。'));
+  for(const zh of [true,false]){
+   const first=rubricQuestion(r,zh);
+   const next=rubricQuestion({...r,history:[{role:'assistant',text:first}]},zh);
+   expect(next).not.toBe(first);
+   expect(next).toMatch(zh?/目标/:/goal/);
+  }
+ });
  it('asks a missing concept after five incomplete rounds without exposing a counter',()=>{const r=rubricRequest('understand',task,Array(6).fill('要做一个用风走的小车，只能用老师给的材料。'));const result=demoProvider(r);expect(result.readiness?.ready).toBe(false);expect(result.text).toMatch(/目标/);expect(result.text).not.toMatch(/回合|轮数|rounds|3\/5/);});
  it('rubric complete before five prompts useful checking without a modal/READY claim',()=>{const r=rubricRequest('understand',task,['要做一个用风走的小车，用老师的材料跑到3米。']);const result=demoProvider(r);expect(result.readiness).toMatchObject({ready:false,meaningfulRounds:1,missingCriteria:[]});expect(result.text).toContain('检查');});
  it('fifth success classifies in one paid call and normalizes READY',async()=>{vi.stubEnv('DEEPSEEK_API_KEY','test-only');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'你的理解已经可以进入下一步了。',readiness:{satisfiedCriteria:task.progressionCriteria!.understand.map(c=>c.id)}})}}]})));const result=await deepseekProvider(rubricRequest());expect(result.readiness?.ready).toBe(true);expect(result.text).toContain('进入下一阶段');expect(fetch).toHaveBeenCalledTimes(1);expect(result.metadata?.promptVersion).toBe('young-learner-v6');});
