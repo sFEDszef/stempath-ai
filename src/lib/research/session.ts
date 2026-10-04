@@ -10,6 +10,7 @@ export type Initiator='STUDENT'|'SYSTEM_RECOMMENDATION'|'RESEARCH_CONDITION';
 export type EventType='STAGE_READY_DECISION'|'STAGE_READY'|'STAGE_OVERRIDE'|'CONFIG_CHANGED'|'WINDOW_HIDDEN'|'WINDOW_VISIBLE'|'IDLE_STARTED'|'ACTIVITY_RESUMED'|'USAGE_LIMIT_REACHED'|'COMPLIANCE_CHECK_PASSED'|'COMPLIANCE_REGENERATION'|'COMPLIANCE_FALLBACK_DEMO'|'AI_REQUEST_STARTED'|'STUDY_METADATA_UPDATED'|'SESSION_STARTED'|'SESSION_COMPLETED'|'SESSION_ENDED'|'TASK_CHANGED'|'STAGE_ENTERED'|'STAGE_COMPLETED'|'STAGE_REOPENED'|'MESSAGE_SENT'|'AI_RESPONSE'|'AI_ERROR'|'SUPPORT_CHANGED'|'ESCALATION_SUGGESTED'|'ESCALATION_ACCEPTED'|'ESCALATION_REJECTED'|'FADING_SUGGESTED'|'FADING_ACCEPTED'|'FADING_REJECTED'|'ARTIFACT_UPDATED'|'AI_CHALLENGE_STARTED'|'AI_CHALLENGE_RESPONSE'|'AI_CHALLENGE_FOLLOW_UP'|'WORKSPACE_RESTORED';
 export type Choice='AGREE'|'DISAGREE'|'NEED_EVIDENCE';
 export interface EventData {
+ meaningfulRounds?:number;requiredRounds?:number;criteriaSatisfiedCount?:number;criteriaRequiredCount?:number;readinessPolicyVersion?:'task-rubric-v1';taskRevision?:number;
  diagnostic?:string;reasonCategory?:string;readinessSource?:import('@/lib/stem/readiness').StageReadinessAssessment['source'];ready?:boolean;
  coach?:CoachMetadata;
  settings?:ResearchConfig;learnerSignal?:string[];pedagogicalDecision?:string;supportRecommendation?:SupportLevel;
@@ -26,7 +27,7 @@ export interface SupportChange {timestamp:string;taskId:string;stage:StageId;fro
 export interface ArtifactRevision {taskId:string;stage:StageId;artifactType:string;version:number;timestamp:string;characterCount:number;text?:string}
 export interface ResearchSession {
  interfaceLanguage?:"zh-CN"|"en";taskLanguage?:"zh-CN"|"en";
- schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4'|'young-learner-v5';readinessPolicyVersion?:'gentle-v1';supportPolicyVersion?:SupportPolicyVersion;provider:string;model:string;taskDefinitionVersion:number;
+ schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4'|'young-learner-v5'|'young-learner-v6';readinessPolicyVersion?:'gentle-v1'|'task-rubric-v1';supportPolicyVersion?:SupportPolicyVersion;provider:string;model:string;taskDefinitionVersion:number;
  participantCode?:string;baselineMeasures:Record<string,number>;outcomeMeasures:Record<string,number>;configSnapshot:ConfigSnapshot;activity:ActivityClock;elapsedDurationMs:number;activeDurationMs:number;usage:{aiCalls:number;inputTokens:number;outputTokens:number;totalTokens:number};
  sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE';condition:Condition;config:ResearchConfig;
  language:'en'|'zh';currentStage:StageId;supportLevel:SupportLevel;taskId:string;completedStages:StageId[];

@@ -24,14 +24,14 @@ describe('stage-consistent physical dialogue',()=>{
   r=next(r,reply.text,'加高一点');reply=demoProvider(r);
   expect(reply.text).toContain('等你亲手试过');expect(reply.text).not.toMatch(/A\.|加高.*还是.*加宽/);expect(reply.readiness?.ready).toBe(false);
   r=next(r,reply.text,'我已经把它加高了，刚刚试了一次。');reply=demoProvider(r);
-  expect(reply.readiness?.ready).toBe(true);expect(reply.text).toContain('这一步已经够用了');expect(reply.text).not.toMatch(/做了哪|试过哪|A\./);
+  expect(reply.readiness?.ready).toBe(false);expect(reply.readiness?.meaningfulRounds).toBeLessThan(5);expect(reply.text).not.toContain('这一步已经够用了');
  });
  it.each(['还没。','还没有。','还没开始。','Not yet.','I haven’t tried yet.'])('allows a physical pause after %s',message=>{
   const r=next(base,demoProvider(base).text,message),reply=demoProvider(r);
   expect(reply.readiness?.ready).toBe(false);expect(reply.text).not.toMatch(/[?？]|A\./);expect(pedagogicallyValid(reply.text,r)).toBe(true);
  });
  it.each([['build','你已经装好了吗？','装好了。'],['test','你实际测到了多少？','2.3米。'],['test','你实际看到了什么？','小车向前走了。'],['test','What did you actually measure?','It travelled 2.3 metres.'],['test','What did you actually measure?','2.3 meters.']] as const)('interprets contextual %s evidence',(stage,question,message)=>{
-  const reply=demoProvider({...base,stage,message,history:[{role:'assistant',text:question}]});expect(reply.readiness?.ready).toBe(true);
+  const reply=demoProvider({...base,stage,message,history:[{role:'assistant',text:question}]});expect(reply.readiness?.ready).toBe(false);
  });
  it.each(['我觉得会跑3米。','我准备测一下。','应该能到3米。','I think it will travel 3 metres.'])('does not upgrade prediction %s',message=>{
   const r={...base,stage:'test' as const,message};expect(demoProvider(r).readiness?.ready).toBe(false);
@@ -53,7 +53,7 @@ describe('stage-consistent physical dialogue',()=>{
  });
  it('Auto fallback retains intent and physical pause semantics without another call',async()=>{
   vi.stubEnv('AI_PROVIDER','deepseek');vi.stubEnv('DEEPSEEK_API_KEY','fake-stage-test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:base.history[0].text})}}]})));
-  const reply=await respond({...base,mode:'auto'});expect(reply).toMatchObject({mode:'demo',suggestions:[],readiness:{ready:false}});expect(reply.text).toContain('你已经选了');expect(fetch).toHaveBeenCalledTimes(1);
+  const reply=await respond({...base,mode:'auto'});expect(reply).toMatchObject({mode:'ai',suggestions:[],readiness:{ready:false}});expect(reply.text).toContain('你已经选了');expect(fetch).toHaveBeenCalledTimes(1);
  });
 });
 describe('free-text only UI, including saved historical suggestions',()=>{

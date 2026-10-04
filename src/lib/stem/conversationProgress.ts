@@ -1,5 +1,5 @@
 import type {ChatRequest,Message,StageId} from '@/types';
-import {assessLocalReadiness,evidenceForStage,meaningfulEvidence,unsafeAction} from './readiness';
+import {requestReadiness,evidenceForStage,meaningfulEvidence,unsafeAction} from './readiness';
 import {stageCheckpoints} from './stageCheckpoints';
 export const evidenceSlots:Record<StageId,readonly [string,string]>={
  understand:['BASIC_GOAL','SUCCESS_CONDITION'],imagine:['IDEA','CHOSEN_DIRECTION'],
@@ -96,9 +96,9 @@ export function conversationProgress(request:ChatRequest){
   latest=contribution(request,turn.text,previous);
   slots[0] ||= latest[0];slots[1] ||= latest[1];
  }
- const ready=slots[0]||assessLocalReadiness(request.task,request.stage,request.artifacts).ready;
+ const assessment=requestReadiness(request);const ready=assessment.ready;
  const target:0|1|2=!slots[0]?0:!slots[1]?1:2;
- return {slots,ready,target,latest,choiceAnswer,futureIntent,prediction,notDone,confused:isConfused(request.message)};
+ return {assessment,slots,ready,target,latest,choiceAnswer,futureIntent,prediction,notDone,confused:isConfused(request.message)};
 }
 /** Keep witnesses for each slot plus recent turns within the existing request limit.
  * Derived every time from the full saved stage conversation; no new persisted state or text copies.
@@ -123,7 +123,9 @@ export function repeatsAnsweredQuestion(text:string,request:ChatRequest){
  const progress=conversationProgress(request);
  if(progress.choiceAnswer&&(answeredChoice(progress.choiceAnswer,text)||(/还是|\bor\b|A[.)、][\s\S]*B[.)、]/i.test(text)&&normalize(text).includes(normalize(progress.choiceAnswer)))))return true;
  const target=questionTarget(request.stage,text);
- if(!progress.confused&&target!==undefined&&progress.slots[target])return true;
+ // Coarse legacy slots do not represent the new task rubric. Only exact
+ // answered questions/scaffolds are repetition; criterion targeting is finer.
+ void target;
  const core=stageCheckpoints(request.task,request.stage).filter(c=>c.core);
  if(!progress.confused&&core.some((field,index)=>progress.slots[index]&&text.includes('___')&&(normalize(text).includes(normalize(field.zh))||normalize(text).includes(normalize(field.en)))))return true;
  const recent=request.history.filter(m=>m.role==='assistant').slice(-3).map(m=>m.text);

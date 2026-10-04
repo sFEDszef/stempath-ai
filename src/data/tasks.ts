@@ -1,3 +1,4 @@
+import {defaultRubric} from '@/lib/stem/rubrics';
 import type { STEMTask } from '@/types';
 export const demoTasks: STEMTask[] = [
  {id:'wind-car',title:'Wind-Powered Car',description:'Design and build a wind-powered car that can travel at least 3 metres using the provided materials. You can choose and modify the materials, test your design, and make improvements.',type:'engineering-design',objectives:['Use wind to produce motion'],successCriteria:['Travel at least 3 metres'],constraints:['Use the provided materials'],availableMaterials:['Materials provided by your teacher']},
@@ -16,4 +17,4 @@ const chineseTasks:Record<string,NonNullable<STEMTask['translations']>['zh-CN']>
  insulation:{title:'保温材料探究',description:'研究哪些材料能更有效地减缓温水冷却。使用教师允许的温水，禁止使用沸水。',constraints:['保持初始条件一致','在成人监督下使用安全温水'],successCriteria:['在固定时间内重复比较温度变化'],availableMaterials:['杯子','布料','纸','温度计','计时器']},
  plants:{title:'植物生长探究',description:'研究光照与幼苗生长的关系，设计公平比较并持续记录观察结果。',constraints:['照顾所有植物','保持其他相关生长条件一致'],successCriteria:['重复测量生长情况，并解释证据及其局限'],availableMaterials:['幼苗','容器','尺子','水']}
 };
-for(const task of demoTasks)task.translations={'zh-CN':chineseTasks[task.id]};
+for(const task of demoTasks){task.translations={'zh-CN':chineseTasks[task.id]};task.taskRevision=2;task.progressionCriteria=defaultRubric(task);}

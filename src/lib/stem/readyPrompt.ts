@@ -3,7 +3,7 @@ import type {StageReadinessAssessment} from './readiness';
 /** READY stays actionable until completion, including restored and previously dismissed projects. */
 export function shouldPromptReady(stage:StageId,active:StageId,completed:StageId[],_previous:StageReadinessAssessment|undefined,next:StageReadinessAssessment){
  void _previous;
- return stage===active&&!completed.includes(stage)&&next.ready;
+ return stage===active&&!completed.includes(stage)&&next.policyVersion==='task-rubric-v1'&&next.ready&&(next.meaningfulRounds??0)>=(next.requiredRounds??5)&&(next.requiredRounds??0)>=5&&next.missingCriteria?.length===0&&next.satisfiedCriteria?.length===next.criteriaRequiredCount;
 }
 export function readyPromptCopy(final:boolean,zh:boolean){
  return {

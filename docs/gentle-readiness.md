@@ -1,3 +1,5 @@
+> Archived policy notes. Current readiness uses [task-specific rubrics and five meaningful rounds](task-rubric-readiness.md). The transition UI remains, but earlier gentle-v1 thresholds below are superseded.
+
 # Semantic Readiness & Gentle Stage Progression
 
 Readiness policy: `gentle-v1`. Prompt: `young-learner-v5`. Support policy remains `v2`; normal support remains Level 2. Research schema/app version remains 0.6/0.7.
