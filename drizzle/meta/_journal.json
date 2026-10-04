@@ -29,6 +29,13 @@
       "when": 1790980000000,
       "tag": "0003_completion_celebration",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791110000000,
+      "tag": "0004_task_rubric_rounds",
+      "breakpoints": true
     }
   ]
 }

@@ -36,10 +36,10 @@ describe('support policy v2',()=>{
  it('advances the next small question after an answer without filling checkpoints',()=>{
   const start=adaptiveDemo({...base,level:3,message:"I don't know"}).text;
   const next=adaptiveDemo({...base,level:3,history:[{role:'assistant',text:start}],message:'The task asks me to build a wind-powered car.'}).text;
-  expect(next).toContain('enough for this step');
-  expect(adaptiveDemo({...base,level:3,stageReady:true,history:[{role:'assistant',text:start},{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'I want to think more.'}).text).toContain('Go to the Next Step');expect(base.artifacts).toEqual({});
+  expect(next).not.toContain('enough for this step');
+  expect(adaptiveDemo({...base,level:3,stageReady:true,history:[{role:'assistant',text:start},{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'I want to think more.'}).text).not.toContain('Go to the Next Step');expect(base.artifacts).toEqual({});
   const changed=adaptiveDemo({...base,level:2,intent:'support-change',stageReady:true,previousLevel:3,history:[{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'Please adjust guidance.'}).text;
-  expect(changed).toContain('Go to the Next Step');
+  expect(changed).not.toContain('Go to the Next Step');
  });
  it.each([1,2,3] as const)('does not repeat the last question after repeated confusion at %s',level=>{
   const first=adaptiveDemo({...base,level}).text;
@@ -92,8 +92,8 @@ describe('support policy v2',()=>{
 describe('research trace isolation',()=>{
  const fresh=()=>startSession(base.task,conditionConfig(),1000,{interfaceLanguage:'en',taskLanguage:'en',provider:'demo',model:'deterministic'});
  it('marks v2 sessions, snapshots, response metadata and every export form',()=>{
-  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v5',readinessPolicyVersion:'gentle-v1',supportPolicyVersion:'v2'}},1200);
-  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v5',readinessPolicyVersion:'gentle-v1',configSnapshot:{supportPolicyVersion:'v2'}});
+  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v6',readinessPolicyVersion:'task-rubric-v1',supportPolicyVersion:'v2'}},1200);
+  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v6',readinessPolicyVersion:'task-rubric-v1',configSnapshot:{supportPolicyVersion:'v2'}});
   for(const output of [exportJSON(s),exportCSV(s),exportBundle([s]),combinedCSV([s])])expect(output).toContain('v2');
   expect(educatorReview(s)[0].supportPolicyVersion).toBe('v2');expect(cleanResearch(s).supportPolicyVersion).toBe('v2');
  });

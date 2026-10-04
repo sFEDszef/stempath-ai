@@ -1,10 +1,13 @@
+import {parseReadiness} from './readiness';
+import {parseDialogue} from '@/lib/projects/storage';
+import type {DialogueMessage} from '@/types';
 import { parseResearchConfig } from '@/lib/research/config';
 import { stageIds } from './stages';
 import { loadTask } from './tasks';
 import type { ChatRequest, LearningArtifacts, StageId } from '@/types';
 export const MAX_HISTORY=12;
 export const MAX_TEXT=4000;
-export const MAX_BODY_BYTES=96_000;
+export const MAX_BODY_BYTES=512_000;
 export function parseArtifacts(input:unknown): LearningArtifacts {
  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('Invalid artifacts');
  const result:LearningArtifacts={};let total=0;
@@ -33,5 +36,10 @@ export function parseChatRequest(input:unknown):ChatRequest {
  if(v.intent!==undefined&&!['chat','challenge','evaluate-claim','support-change'].includes(v.intent as string))throw new Error('Invalid intent');
  if(v.previousLevel!==undefined&&(![1,2,3].includes(v.previousLevel as number)||v.intent!=='support-change'))throw new Error('Invalid previous level');
  if(v.claim!==undefined&&!text(v.claim,4000))throw new Error('Invalid claim');
- return {stageReady:v.stageReady as boolean|undefined,interfaceLanguage:v.interfaceLanguage as ChatRequest["interfaceLanguage"],taskLanguage:v.taskLanguage as ChatRequest["taskLanguage"],...(v.previousLevel===undefined?{}:{previousLevel:v.previousLevel as ChatRequest['level']}),research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
+ const progressionHistory:DialogueMessage[]|undefined=v.progressionHistory===undefined?undefined:parseProgressionHistory(v.progressionHistory);
+ if(v.messageId!==undefined&&(typeof v.messageId!=='string'||v.messageId.length>100||!v.messageId))throw Error('Invalid message ID');
+ if(v.continueExploring!==undefined&&typeof v.continueExploring!=='boolean')throw Error('Invalid exploration choice');
+ return {messageId:v.messageId as string|undefined,progressionHistory,priorReadiness:parseReadiness(v.priorReadiness,v.stage as StageId,'AI_SEMANTIC'),continueExploring:v.continueExploring===true,stageReady:v.stageReady as boolean|undefined,interfaceLanguage:v.interfaceLanguage as ChatRequest["interfaceLanguage"],taskLanguage:v.taskLanguage as ChatRequest["taskLanguage"],...(v.previousLevel===undefined?{}:{previousLevel:v.previousLevel as ChatRequest['level']}),research:parseResearchConfig(v.research),stage:v.stage as StageId,level:v.level as ChatRequest['level'],message:(v.message as string).trim(),history,task:loadTask(v.task),artifacts:parseArtifacts(v.artifacts),completed:[...new Set(v.completed)] as StageId[],mode:v.mode as ChatRequest['mode'],intent:v.intent as ChatRequest['intent'],claim:v.claim as string|undefined};
 }
+
+export function parseProgressionHistory(value:unknown):DialogueMessage[]{if(!Array.isArray(value)||value.length>200)throw Error('Invalid progression history');return value.map(m=>{if(!m||typeof m!=='object'||typeof m.id!=='string'||!m.id||m.id.length>100||!['student','assistant'].includes(m.role)||typeof m.text!=='string'||m.text.length>2000)throw Error('Invalid progression turn');return {id:m.id,role:m.role,text:m.text,dialogue:parseDialogue(m.dialogue)};});}

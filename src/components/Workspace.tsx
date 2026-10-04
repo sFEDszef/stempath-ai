@@ -47,6 +47,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const {event:researchEvent,language:researchLanguage}=research;
   const primary=targetGradeBand(task)!=="G7+";
   const stages=getStages(task).map(s=>({...s,title:primary?(locale==="zh-CN"&&s.id==="build"&&/inquiry|investigation/.test(task.type)?"开始探究":childStageNames[s.id][locale==="zh-CN"?0:1]):locale==="zh-CN"?t(`stage.${s.id}`):s.title,description:primary?({understand:["任务要做什么","Find the goal"],imagine:["想一个办法","Think of an idea"],plan:["准备怎么做","Plan a small step"],build:["亲手试一试","Try your plan"],test:["看看结果","Look at the result"],improve:["试着改一点","Try a small change"],reflect:["说说学到了什么","Share what you learned"]}[s.id][locale==="zh-CN"?0:1]):t(s.description),question:primary?youngQuestion({task,stage:s.id,level:1,message:"",history:[],artifacts:{},completed:[]},locale==="zh-CN"):t(s.question)}));
+  const [staying,setStaying]=useState<Partial<Record<StageId,boolean>>>({});
   const [readiness,setReadiness]=useState(initialProject.readiness);
   const readinessRef=useRef(initialProject.readiness);
   const [completionCelebrationSeen,setCompletionCelebrationSeen]=useState(initialProject.completionCelebrationSeen);
@@ -81,7 +82,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = stages.find((s) => s.id === active)!;
   const messages:Message[] = conversations[active] ?? [{id:`welcome-${active}`,role:'assistant',text:`${task.title} · ${stage.title}。${youngReply({task,stage:active,level,message:'',history:[],artifacts:records,completed},locale==='zh-CN')}`,suggestions:[]}];
-  const adaptiveRequest:ChatRequest={stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:conversationHistory({task,stage:active},messages),artifacts:records,completed,mode,research:config};
+  const adaptiveRequest:ChatRequest={priorReadiness:readiness[active],continueExploring:!!staying[active],progressionHistory:messages.slice(-200).map(({id,role,text,dialogue})=>({id,role,text:text.slice(0,2000),dialogue})),stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',task,stage:active,level,message:'',history:conversationHistory({task,stage:active},messages),artifacts:records,completed,mode,research:config};
   const adaptive=useAdaptive(adaptiveRequest);
   const lang=adaptive.decision.state.language;
   useEffect(()=>{researchLanguage(lang);},[lang,researchLanguage]);
@@ -95,20 +96,24 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
 
 
   function latchReady(id:StageId,a:StageReadinessAssessment){
-    if(!a.ready||readinessRef.current[id]?.ready)return;
+    const prior=readinessRef.current[id];
+    const next={...a,promptSeen:prior?.promptSeen??false};
+    if(JSON.stringify(prior)===JSON.stringify(next))return;
+    readinessRef.current={...readinessRef.current,[id]:next};setReadiness(readinessRef.current);
+    if(!a.ready||prior?.ready)return;
     if(id===active)setCompletionWarning([]);
     // The provider cannot acknowledge a learner-facing dialog on the student's behalf.
     readinessRef.current={...readinessRef.current,[id]:{...a,promptSeen:false}};setReadiness(readinessRef.current);
-    researchEvent('STAGE_READY',{systemAction:'SEMANTIC_MINIMUM_EVIDENCE',reasonCategory:a.criterion,readinessSource:a.source,ready:true},id);
+    researchEvent('STAGE_READY',{systemAction:'SEMANTIC_MINIMUM_EVIDENCE',reasonCategory:a.criterion,readinessSource:a.source,ready:true,meaningfulRounds:a.meaningfulRounds,requiredRounds:a.requiredRounds,criteriaSatisfiedCount:a.satisfiedCriteria?.length,criteriaRequiredCount:a.criteriaRequiredCount,readinessPolicyVersion:a.policyVersion,taskRevision:task.taskRevision??1},id);
   }
-  useEffect(()=>{const a=assessLocalReadiness(task,active,records,conversations[active]);if(a.ready)latchReady(active,a);
+  useEffect(()=>{const a=assessLocalReadiness(task,active,records,conversations[active],readinessRef.current[active]?.source??'DEMO',readinessRef.current[active]);latchReady(active,a);
   // A latch is driven by learner records, not render-time coaching suggestions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[task,active,records,conversations]);
   const safetyBlocked=[...Object.values(records[active]??{}),conversations[active]?.filter(m=>m.role==='student').at(-1)?.text??''].some(text=>unsafeAction(task,text));
   const canContinue=(!safetyBlocked&&!!readiness[active]?.ready)||completed.includes(active);
   // Derive visibility from live state, never from the legacy one-time promptSeen flag.
-  const readyPrompt=restored&&!finished&&!safetyBlocked&&pending.length===0&&!research.busy&&shouldPromptReady(active,active,completed,readiness[active],readiness[active]??{ready:false,source:'DEMO'})?active:null;
+  const readyPrompt=restored&&!finished&&!staying[active]&&!safetyBlocked&&pending.length===0&&!research.busy&&shouldPromptReady(active,active,completed,readiness[active],readiness[active]??{ready:false,source:'DEMO'})?active:null;
   useEffect(()=>{
     if(readyPrompt&&!readinessRef.current[readyPrompt]?.promptSeen){
       readinessRef.current={...readinessRef.current,[readyPrompt]:{...readinessRef.current[readyPrompt]!,promptSeen:true}};
@@ -143,9 +148,10 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
     return true;
   }
   function focusWorkspace(){requestAnimationFrame(()=>{const el=document.getElementById('main');el?.focus();el?.scrollIntoView({behavior:'smooth'});});}
-  function readyDecision(){
+  function readyDecision(action:'ADVANCE'|'STAY'){
     if(!readyPrompt||finished||pendingRef.current.size||research.busy||safetyBlocked||completionSaving)return;
-    researchEvent('STAGE_READY_DECISION',{studentAction:'ADVANCE'},readyPrompt);
+    researchEvent('STAGE_READY_DECISION',{studentAction:action},readyPrompt);
+    if(action==='STAY'){setStaying(prev=>({...prev,[readyPrompt]:true}));focusWorkspace();return;}
     completeStage();
   }
   function chooseSupport(accept:boolean){
@@ -213,7 +219,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
 
       setResponseMode(response.mode);
       const assessment=parseReadiness(response.readiness,requestStage,response.readiness?.source??'DEMO');if(assessment)latchReady(requestStage,assessment);
-      setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response}]}));
+      setConversations(prev => ({...prev,[requestStage]:[...(prev[requestStage]??[]),{id:crypto.randomUUID(),role:"assistant",...response,dialogue:{intent:request.intent??'chat',replyTo:request.messageId,successful:true,receipt:response.roundReceipt}}]}));
     } catch (error) {
       if(!alive.current)return;
 
@@ -226,20 +232,20 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   async function send(text: string, claim?:string) {
     if (!text.trim() || (pendingRef.current.size>0||research.busy)||!coachEnabled||finished) return;
     const studentText=claim?`Regarding this unverified claim: “${claim}”\n\n${text.trim()}`:text.trim();
-    const request:ChatRequest = {stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:conversationHistory({task,stage:active},messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
+    const messageId=crypto.randomUUID();
+    const request:ChatRequest = {messageId,priorReadiness:readiness[active],continueExploring:!!staying[active],progressionHistory:messages.slice(-200).map(({id,role,text,dialogue})=>({id,role,text:text.slice(0,2000),dialogue})),stageReady:!!readiness[active]?.ready,projectId:initialProject.id,interfaceLanguage:locale,taskLanguage:/[\u3400-\u9fff]/.test(task.title)?'zh-CN':'en',stage:active,level,message:studentText,history:conversationHistory({task,stage:active},messages),task,artifacts:records,completed,mode,research:config,intent:claim?"evaluate-claim":"chat",claim};
     adaptive.onStudentTurn();
     const decision=decidePedagogicalAction({...request,message:text.trim()});
     research.event('MESSAGE_SENT',{messageText:text.trim(),learnerSignal:Object.entries(decision.state.signals).filter(([,v])=>v).map(([key])=>key),pedagogicalDecision:decision.action,supportRecommendation:decision.recommendation});
     if(!claim&&challengeRef.current?.stage===active){const signals=decision.state.signals;const action=/test|trial|measure|测试|检验|测量/i.test(text)?'TEST':signals.reasoning?'REASON':signals.uncertain?'REQUEST_HELP':undefined;
       if(action)research.event('AI_CHALLENGE_FOLLOW_UP',{challengeId:challengeRef.current.id,followUpAction:action});}
 
-    setConversations(prev => ({...prev,[active]:[...(prev[active]??[]),{id:crypto.randomUUID(),role:"student",text:studentText}]}));
+    setConversations(prev => ({...prev,[active]:[...(prev[active]??[]),{id:messageId,role:"student",text:studentText,dialogue:{intent:claim?'evaluate-claim':'chat'}}]}));
     await deliver(request);
-    const fallback=assessLocalReadiness(task,request.stage,records,[...request.history,{role:'student',text:studentText}],'DEMO');latchReady(request.stage,fallback);
   }
   function retry() {
     const failed = chatErrors[active];
-    if(!failed&&messages.at(-1)?.role==='student'){void deliver({...adaptiveRequest,message:messages.at(-1)!.text,history:conversationHistory(adaptiveRequest,messages.slice(0,-1))});return;}
+    if(!failed&&messages.at(-1)?.role==='student'){void deliver({...adaptiveRequest,messageId:messages.at(-1)!.id,message:messages.at(-1)!.text,history:conversationHistory(adaptiveRequest,messages.slice(0,-1))});return;}
     // Reuse the failed turn without adding another student bubble; honour the current meter.
     if (failed?.retryable) void deliver({...failed.request,level,mode,research:config});
   }
@@ -312,6 +318,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
           />
           {completionWarning.length>0&&<section className="rail-section" role="alert"><p>{locale==='zh-CN'?'还差一个小步骤。':'One small step to go.'} {completionWarning[0]}</p>{researchVisible&&<button onClick={()=>completeStage(true)}>{t('Force Continue (teacher)')}</button>}</section>}
           {completed.includes('reflect')&&<section className="rail-section completion-summary"><h2>{t('Project complete!')}</h2><p>{t('You can revisit your steps and notes.')}</p></section>}
+          {researchVisible&&<section className="rail-section" aria-label="Progression diagnostics"><h2>{locale==='zh-CN'?'阶段前进诊断':'Stage progression diagnostics'}</h2><p>meaningfulRounds: {readiness[active]?.meaningfulRounds??0} / {readiness[active]?.requiredRounds??5}</p><p>criteriaSatisfied: {readiness[active]?.satisfiedCriteria?.length??0} / {readiness[active]?.criteriaRequiredCount??task.progressionCriteria?.[active].length??0}</p><p>missingCriteria: {readiness[active]?.missingCriteria?.join(', ')}</p><small>task-rubric-v1 · taskRevision {task.taskRevision??1}</small></section>}
           {researchVisible&&<ResearchPanel research={research} task={task} decision={adaptive.decision} onReset={onResearchReset} onClear={onResearchClear} onTask={onAssignTask} onHide={onHideResearch}/>}
           <p className="workspace-footer">
             <span>{t("Every question is a step forward.")}</span>

@@ -1,3 +1,5 @@
+> Archived policy notes. Current readiness uses [task-specific rubrics and five meaningful rounds](task-rubric-readiness.md). The transition UI remains, but earlier gentle-v1 thresholds below are superseded.
+
 # Required transitions after minimum evidence
 
 The previous one-time modal was suppressed by persisted `promptSeen` and the readiness latch after Stay, Escape, closing, or reloading. READY chat acknowledgements therefore did not guarantee a visible advancement action.
