@@ -18,10 +18,10 @@ export async function guardedCoach(request:Request,handle:(r:Request)=>Promise<R
  if(!stageIds.includes(stage))return fail(400,'Invalid stage');
  const saved=p.conversations[stage]??[],trusted=new Map(saved.map(m=>[m.id,m]));
  const supplied=parseProgressionHistory(body.progressionHistory??[]);
- for(const [index,m] of supplied.entries()){
+ for(const m of supplied){
   if(trusted.has(m.id))continue;
   if(m.role==='assistant'){
-   const student=supplied[index-1];if(!student||student.role!=='student'||!verifiedRound(p.id,p.task,stage,student as Message,m as Message))continue;
+   const student=trusted.get(m.dialogue?.replyTo??'');if(!student||student.role!=='student'||!verifiedRound(p.id,p.task,stage,student as Message,m as Message))continue;
   }
   trusted.set(m.id,m as Message);
  }

@@ -31,6 +31,11 @@ describe('meaningful completed rounds',()=>{
  it('excludes all non-chat dialogue intentions even if a UI action has a response',()=>{
   for(const intent of ['challenge','evaluate-claim','support-change'] as const){const turns=dialogue([windTurns.understand[0]]);turns[0].dialogue={intent};turns[1].dialogue={intent,replyTo:turns[0].id,successful:true};expect(completedRounds(task,'understand',turns)).toHaveLength(0);}
  });
+ it('counts a successful retry of its original learner message across a support-change reply',()=>{
+  const [student,coach]=dialogue([windTurns.understand[0]]);
+  const support={id:'support',role:'assistant' as const,text:'我会调整帮助。',dialogue:{intent:'support-change' as const,successful:true}};
+  expect(completedRounds(task,'understand',[student,support,coach])).toHaveLength(1);
+ });
  it('is stage/task-relevant and independent of support levels',()=>{expect(meaningfulRound(task,'understand','这辆小车用风推动。')).toBe(true);expect(meaningfulRound(task,'understand','我想讨论电影。')).toBe(false);for(const level of [1,2,3] as const)expect(requestReadiness({...rubricRequest(),level})).toMatchObject({ready:true,meaningfulRounds:5,requiredRounds:5});});
 });
 describe('AND gate across all seven Wind Car stages',()=>{

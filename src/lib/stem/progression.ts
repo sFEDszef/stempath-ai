@@ -18,10 +18,10 @@ export function completedRounds(task:STEMTask,stage:StageId,messages:EvidenceMes
  const result:{id:string;text:string;previous:string}[]=[];const seen=new Set<string>();let previous='';
  for(let index=0;index<messages.length;index++){
   const coach=messages[index];if(coach.role!=='assistant')continue;
-  const student=messages[index-1];
+  const explicit=coach.dialogue;
+  const student=explicit?.replyTo?messages.slice(0,index).find(m=>m.role==='student'&&m.id===explicit.replyTo):messages[index-1];
   if(student?.role==='student'){
    const id=student.id??`legacy-${index-1}`;
-   const explicit=coach.dialogue;
    const successful=explicit?explicit.successful===true&&explicit.intent==='chat'&&explicit.replyTo===id:true;
    if(successful&&(!student.dialogue||student.dialogue.intent==='chat')&&!seen.has(id)&&meaningfulRound(task,stage,student.text,previous)){seen.add(id);result.push({id,text:student.text,previous});}
   }
