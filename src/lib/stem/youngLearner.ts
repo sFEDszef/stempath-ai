@@ -50,11 +50,9 @@ export function youngReply(request:ChatRequest,zh:boolean){
  const acknowledgement=progress.latest[0]?readinessCopy[request.stage][i]:progress.latest[1]?
   (zh?'你已经说出了'+(request.stage==='build'?'看到的结果。':'这一点。'):'You have shared '+(request.stage==='build'?'what happened.':'that part.')):'';
  // Readiness is deliberately one contribution, not completion of both conversation slots.
- if(progress.ready&&!request.stageReady){
-  const choices=zh?['你想怎样继续？','你想进入下一阶段，还是留下再想一想？','你想现在继续，还是多探索一点？','你想选择哪种继续方式？']:['How would you like to continue?','Would you like to move on or stay to think more?','Would you like to continue now or explore more?','Which way would you like to continue?'];
-  const question=choices.find(q=>!previous.some(m=>m.text.includes(q)))??choices[request.history.length%choices.length];
-  const transition=request.stage==='reflect'?(zh?' 这一步已经够用了！你可以选择完成项目，或留在这里多想一点。':' You have enough for this step! You can finish the project or stay to explore more. '):(zh?' 这一步已经够用了！你可以选择进入下一阶段，或留在这里多想一点。':' You have enough for this step! You can move on or stay to explore more. ');
-  return support+acknowledgement+transition+question;
+ if(progress.ready||request.stageReady){
+  const transition=request.stage==='reflect'?(zh?' 这一步已经够用了！请点击“完成项目”，保存这次探究。':' You have enough for this step! Select “Finish Project” to save your journey.'):(zh?' 这一步已经够用了！请点击“进入下一阶段”，继续探究。':' You have enough for this step! Select “Go to the Next Step” to continue your exploration.');
+  return support+readinessCopy[request.stage][i]+transition;
  }
  // Physical stages concern actual actions/results, not a repeated design choice.
  if(!progress.ready&&!request.stageReady&&(request.stage==='build'||request.stage==='test')){
@@ -67,11 +65,9 @@ export function youngReply(request:ChatRequest,zh:boolean){
   }
   if(progress.latest[1])return support+acknowledgement+' '+(previous.some(m=>m.text.includes('现在回想实际动手'))?(zh?'结果已经记住了。你亲手试过哪一小步？':'We have your observation. What small step did you try yourself?'):(zh?'现在回想实际动手：你已经做了哪一步？':'Now think about your actual action: what step did you try yourself?'));
  }
- const optional=progress.ready||request.stageReady;
- const prefix=optional?(zh?'你可以按自己的兴趣继续探索。':'You can explore more if you wish. '):'';
+ const prefix='';
  const repair=progress.confused?(zh?'换个简单说法，我们只想一小步。':'Let’s say it more simply and take one small step.')+' ':'';
  let question=progress.confused?repairs[request.stage][index][i]:youngQuestion(request,zh);
- if(optional&&request.stage==='imagine'&&progress.target===1)question=zh?'你觉得还有什么不同的办法？':'What other different idea could you compare?';
  const clue=progress.target===1?(zh?'可以看看这一点和刚才的回答有什么联系。':'You can connect this part with what you just shared.'):hints[request.stage][i];
  const criterion=request.stage==='understand'&&request.level>1&&progress.target===0?request.task.successCriteria?.[0]:undefined;
  const fact=criterion?(zh?`题目写着：“${criterion.slice(0,120)}”。`:`The task says: “${criterion.slice(0,120)}”.`):clue;
@@ -89,8 +85,8 @@ export function youngReply(request:ChatRequest,zh:boolean){
    progress.target===2?(zh?['如果再做一次，你想检查哪一点？','你还想探索自己的哪个想法？','你想怎样继续探索？']:['If you tried again, what would you check?','Which of your ideas would you like to explore more?','How would you like to explore further?']):
    (zh?[repairs[request.stage][index][0],'接着这一点，你想说哪一小句？','你还想补充自己的哪一点？','你想怎样继续探索？']: [repairs[request.stage][index][1],'What small part would you add next?','What else would you like to share?','How would you like to explore further?']);
   question=alternatives.find(q=>!previous.some(m=>m.text.includes(q)))??alternatives[0];
-  text=`${support}${acknowledgement} ${repair}${optional?prefix:clue+' '}${question}`;
+  text=`${support}${acknowledgement} ${repair}${clue+' '}${question}`;
  }
  return text.trim();
 }
-export function gradeStagePolicy(request:ChatRequest){const band=targetGradeBand(request.task);return `Target grade band: ${band}. Optional learner record prompts: ${stageCheckpoints(request.task,request.stage,request.research?.condition!=='NO_AI').filter(c=>c.core).map(c=>c.en).join('; ')}. Encourage ONE small contribution at a time. Records are notes, not progression gates; one minimum stage-relevant contribution is enough to continue. Use the selected support level: Level 1 adds a clue and simpler question; Level 2 adds a partial frame or limited choice; Level 3 briefly explains, decomposes into 2–3 micro-steps and asks ONLY the first small decision, then continues after the child answers. Never reset the same scaffold or choice. Build questions ask what was actually done; Test questions ask actual observed/measured results. Remember future intent and selected choices without granting actual evidence. If not yet done, allow a concise physical-action pause without another question. Ordinary coaching has no quick replies. Do not present a long worksheet. Do not require every optional field or fill all checkpoints. Help notice supplied successCriteria without designing the solution. Never ask the same substantive question after a relevant answer. Use cumulative current-stage chat evidence even when records are blank. After confusion change and simplify the wording. After a completed micro-step continue with the next missing part, never restart the scaffold. When minimum evidence is reached acknowledge readiness without a mandatory second checkpoint; after the learner stays, further exploration is optional. A brief purpose cue may explain why a question matters. Use current-task objects only; never import an example from another task. No AI-literacy reflection in NO_AI.`;}
+export function gradeStagePolicy(request:ChatRequest){const band=targetGradeBand(request.task);return `Target grade band: ${band}. Optional learner record prompts: ${stageCheckpoints(request.task,request.stage,request.research?.condition!=='NO_AI').filter(c=>c.core).map(c=>c.en).join('; ')}. Encourage ONE small contribution at a time. Records are notes, not progression gates; one minimum stage-relevant contribution is enough to continue. Use the selected support level: Level 1 adds a clue and simpler question; Level 2 adds a partial frame or limited choice; Level 3 briefly explains, decomposes into 2–3 micro-steps and asks ONLY the first small decision, then continues after the child answers. Never reset the same scaffold or choice. Build questions ask what was actually done; Test questions ask actual observed/measured results. Remember future intent and selected choices without granting actual evidence. If not yet done, allow a concise physical-action pause without another question. Ordinary coaching has no quick replies. Do not present a long worksheet. Do not require every optional field or fill all checkpoints. Help notice supplied successCriteria without designing the solution. Never ask the same substantive question after a relevant answer. Use cumulative current-stage chat evidence even when records are blank. After confusion change and simplify the wording. After a completed micro-step continue with the next missing part, never restart the scaffold. When minimum evidence is reached, acknowledge it briefly and direct the learner to the next-stage confirmation (Finish Project at Reflect). Do not ask another question, offer staying, or add optional deepening. The application owns stage completion and advancement. A brief purpose cue may explain why a question matters. Use current-task objects only; never import an example from another task. No AI-literacy reflection in NO_AI.`;}

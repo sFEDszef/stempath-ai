@@ -1,0 +1,9 @@
+# Required transitions after minimum evidence
+
+The previous one-time modal was suppressed by persisted `promptSeen` and the readiness latch after Stay, Escape, closing, or reloading. READY chat acknowledgements therefore did not guarantee a visible advancement action.
+
+The current workspace derives the modal from the active unfinished stage's readiness after loading and after an in-flight reply settles. Legacy `promptSeen` is kept for storage compatibility but never gates visibility. All seven stages have one confirmation action; Escape and backdrop clicks keep it open. Confirmation reuses guarded completion and canonical next-stage entry, and logs ADVANCE before those events. Completed-stage review does not reopen the modal. Reflect still requires explicit Finish Project; saved seven-stage completion alone triggers the existing one-time ceremony.
+
+Readiness remains gentle-v1 and unchanged across support levels. Build needs an actual attempt and Test an actual observation/result; future plans and predictions do not count. Current-stage learner chat is assessed on restoration as well as optional records. Unsafe latest actions suppress transition until addressed. New READY replies acknowledge sufficiency and direct advancement with zero follow-up questions. Server-side AI classification and local evidence are validated before deterministic transition wording; no additional paid generation is used to fix a lingering question. Provider identity and actual usage remain recorded.
+
+Historical STAY research events and historical chat text remain intact. New required transitions emit no STAY events. No database migration, authentication change, asset change or deployment architecture change is needed.

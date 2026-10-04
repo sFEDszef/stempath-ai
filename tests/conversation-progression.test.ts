@@ -67,7 +67,7 @@ describe('cumulative conversation evidence, separate from records and readiness'
  });
 });
 const examples:[StageId,string,string][]=[['understand','我们要让小车跑起来','这个任务要你做什么？'],['imagine','我想把帆做大一点','你想到一个什么办法或猜想？'],['plan','先把大一点的帆装上去','你准备先做什么？'],['build','我把帆装上去了','你已经做了哪一步？'],['test','2.1米','你实际测到或看到什么结果？'],['improve','我想把轮子调直一点','你觉得哪里值得改一改？'],['reflect','我发现测试以后再修改会更好','你学会了什么，或改变了什么想法？']];
-describe('gentle READY and optional exploration at all seven stages',()=>{
+describe('gentle READY transitions at all seven stages',()=>{
  it.each(examples)('%s needs only its minimum contribution',(stage,message,question)=>{
   for(const level of [1,2,3] as const){
    const r={...base,stage,level,message,history:[{role:'assistant' as const,text:question}]},response=demoProvider(r);
@@ -75,7 +75,7 @@ describe('gentle READY and optional exploration at all seven stages',()=>{
    expect(response.text).not.toContain(question);expect(pedagogicallyValid(response.text,r)).toBe(true);
    const stay={...append(r,response.text,'我想继续想一想。'),stageReady:true};
    const extra=demoProvider(stay);
-   expect(extra.text).toContain('按自己的兴趣继续探索');expect(extra.text).not.toMatch(/还差|你还需要|必须完成/);
+   expect(extra.text).toContain(stage==='reflect'?'完成项目':'进入下一阶段');expect(extra.text).not.toMatch(/[?？]|还差|你还需要|必须完成|兴趣继续探索/);
    expect(pedagogicallyValid(extra.text,stay)).toBe(true);expect(stay.artifacts).toEqual({});
   }
  });
@@ -85,7 +85,7 @@ describe('gentle READY and optional exploration at all seven stages',()=>{
   const answer=append(r,first,'这个任务要让小车跑起来。');
   const ready=adaptiveDemo(answer).text;expect(ready).toContain('这一步已经够用了');
   const second=adaptiveDemo({...append(answer,ready,'我想留下多想一点。'),stageReady:true}).text;
-  expect(second).toContain('做到什么样，就算成功');expect(second).not.toContain('1. 找出任务要做的事');
+  expect(second).toContain('进入下一阶段');expect(second).not.toMatch(/[?？]/);expect(second).not.toContain('1. 找出任务要做的事');
  });
  it('both conversation slots lead to optional exploration without re-asking either',()=>{const r={...base,stageReady:true,history:[...base.history,{role:'student' as const,text:base.message},{role:'assistant' as const,text:'你亲手试过哪一小步？'},{role:'student' as const,text:'我把帆装上去了。'}],message:'我想多想一点'};for(const level of [1,2,3] as const){const reply=adaptiveDemo({...r,level});expect(conversationProgress(r).slots).toEqual([true,true]);expect(repeatsAnsweredQuestion(reply.text,{...r,level})).toBe(false);expect(pedagogicallyValid(reply.text,{...r,level})).toBe(true);}});
  it('Level 2 never repeats an answered frame',()=>{
@@ -109,11 +109,11 @@ describe('provider anti-repetition, safe fallback and suggestions',()=>{
   const r={...base,message:'不知道',history:[{role:'assistant' as const,text:'可以先填一小句：你亲手试过哪一小步？'}]};
   expect(repeatsAnsweredQuestion('你 亲手试过 哪一小步?',r)).toBe(true);
  });
- it('real provider gets categorical evidence plus optional mode and trusted non-repetition policy',()=>{
+ it('real provider gets categorical evidence plus required transition mode and trusted non-repetition policy',()=>{
   const messages=buildDeepSeekMessages({...base,stageReady:true});
   expect(messages[0].content).toContain('Never ask the same substantive question twice');
   expect(messages[0].content).toContain('Blank structured records');
-  expect(JSON.parse(messages[1].content).conversationProgress).toEqual({slots:{ACTUAL_ATTEMPT:false,OBSERVATION:true},minimumReady:false,optionalDeepening:true,answeredChoice:false,futureIntent:false,prediction:false,notDone:false});
+  expect(JSON.parse(messages[1].content).conversationProgress).toEqual({slots:{ACTUAL_ATTEMPT:false,OBSERVATION:true},minimumReady:false,transitionRequired:true,answeredChoice:false,futureIntent:false,prediction:false,notDone:false});
   expect(evidenceSlots.build).toEqual(['ACTUAL_ATTEMPT','OBSERVATION']);
  });
  it('DeepSeek pedagogical fallback uses the same progress without another paid call',async()=>{

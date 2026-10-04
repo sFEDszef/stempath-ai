@@ -21,7 +21,7 @@ import {StageCheckpoint} from "./StageCheckpoint";
 import {conversationHistory} from "@/lib/stem/conversationProgress";
 import {youngReply,youngQuestion} from "@/lib/stem/youngLearner";
 import {targetGradeBand} from "@/lib/stem/gradeBands";
-import {unsafeAction,assessLocalReadiness,parseReadiness,readinessCopy,missingCue,type StageReadinessAssessment} from '@/lib/stem/readiness';
+import {unsafeAction,assessLocalReadiness,parseReadiness,missingCue,type StageReadinessAssessment} from '@/lib/stem/readiness';
 import {accessibleStage,nextStage,childStageNames} from "@/lib/stem/stageCheckpoints";
 import type {Project,ProjectProgress} from "@/lib/projects/storage";
 import { getStages, keyQuestions, pedagogy } from "@/lib/stem/stages";
@@ -53,9 +53,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   const [celebrating,setCelebrating]=useState(false);
   const [completionSaving,setCompletionSaving]=useState(false);
   const completionRetry=useRef<ProjectProgress|null>(null);
-  const [readyPrompt,setReadyPrompt]=useState<StageId|null>(null);
   const activeRef=useRef(initialProject.active);
-  const [readyDismissed,setReadyDismissed]=useState<Partial<Record<StageId,boolean>>>({});
   const [records,setRecords]=useState<Thinking>(initialProject.records);
   const [restored,setRestored]=useState(false);
   const [mode,setMode]=useState<'auto'|'deepseek'|'demo'>('auto');
@@ -99,18 +97,24 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
   function latchReady(id:StageId,a:StageReadinessAssessment){
     if(!a.ready||readinessRef.current[id]?.ready)return;
     if(id===active)setCompletionWarning([]);
-    const show=shouldPromptReady(id,activeRef.current,completed,readinessRef.current[id],a)&&!finished;
     // The provider cannot acknowledge a learner-facing dialog on the student's behalf.
-    readinessRef.current={...readinessRef.current,[id]:{...a,promptSeen:show}};setReadiness(readinessRef.current);
-    if(show)setReadyPrompt(id);
+    readinessRef.current={...readinessRef.current,[id]:{...a,promptSeen:false}};setReadiness(readinessRef.current);
     researchEvent('STAGE_READY',{systemAction:'SEMANTIC_MINIMUM_EVIDENCE',reasonCategory:a.criterion,readinessSource:a.source,ready:true},id);
   }
-  useEffect(()=>{const a=assessLocalReadiness(task,active,records);if(a.ready)latchReady(active,a);
+  useEffect(()=>{const a=assessLocalReadiness(task,active,records,conversations[active]);if(a.ready)latchReady(active,a);
   // A latch is driven by learner records, not render-time coaching suggestions.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[task,active,records]);
+  },[task,active,records,conversations]);
   const safetyBlocked=[...Object.values(records[active]??{}),conversations[active]?.filter(m=>m.role==='student').at(-1)?.text??''].some(text=>unsafeAction(task,text));
   const canContinue=(!safetyBlocked&&!!readiness[active]?.ready)||completed.includes(active);
+  // Derive visibility from live state, never from the legacy one-time promptSeen flag.
+  const readyPrompt=restored&&!finished&&!safetyBlocked&&pending.length===0&&!research.busy&&shouldPromptReady(active,active,completed,readiness[active],readiness[active]??{ready:false,source:'DEMO'})?active:null;
+  useEffect(()=>{
+    if(readyPrompt&&!readinessRef.current[readyPrompt]?.promptSeen){
+      readinessRef.current={...readinessRef.current,[readyPrompt]:{...readinessRef.current[readyPrompt]!,promptSeen:true}};
+      setReadiness(readinessRef.current);
+    }
+  },[readyPrompt]);
   async function persistFinal(state:ProjectProgress){
     setCompletionSaving(true);
     completionRetry.current=state;
@@ -139,15 +143,10 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
     return true;
   }
   function focusWorkspace(){requestAnimationFrame(()=>{const el=document.getElementById('main');el?.focus();el?.scrollIntoView({behavior:'smooth'});});}
-  function readyDecision(action:'ADVANCE'|'STAY'){
-    if(!readyPrompt)return;
-    if(action==='ADVANCE'){
-      // Reuse the guarded completion flow; log the choice before its completion/entry events.
-      if(finished||pendingRef.current.size||research.busy||safetyBlocked)return;
-      researchEvent('STAGE_READY_DECISION',{studentAction:action},readyPrompt);
-      if(!completeStage())return;
-    }else {researchEvent('STAGE_READY_DECISION',{studentAction:action},readyPrompt);focusWorkspace();}
-    setReadyPrompt(null);
+  function readyDecision(){
+    if(!readyPrompt||finished||pendingRef.current.size||research.busy||safetyBlocked||completionSaving)return;
+    researchEvent('STAGE_READY_DECISION',{studentAction:'ADVANCE'},readyPrompt);
+    completeStage();
   }
   function chooseSupport(accept:boolean){
     if(!adaptive.showRecommendation||(pendingRef.current.size>0||research.busy)||finished)return;
@@ -271,7 +270,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
       <a href="#main" className="skip-link">{t("Skip to learning workspace")}</a>
       <Header onNavigate={navigate} />
       {celebrating&&<ProjectCompletionModal zh={locale==='zh-CN'} onClose={action=>{setCelebrating(false);if(action==='PROJECT')onNavigate('My Projects');else focusWorkspace();}}/>}
-      {readyPrompt&&<ReadyTransitionModal final={readyPrompt==='reflect'} zh={locale==='zh-CN'} disabled={pending.length>0||research.busy||safetyBlocked} onDecision={readyDecision}/>}
+      {readyPrompt&&<ReadyTransitionModal final={readyPrompt==='reflect'} zh={locale==='zh-CN'} disabled={completionSaving} onDecision={readyDecision}/>}
       <div className="workspace-shell">
         <ProgressSidebar
           stages={stages}
@@ -290,7 +289,7 @@ export default function Workspace({task,initialProject,saveStatus,onSaveRetry,on
           <ChallengeCard task={task} />
           <p className="save-status" role="status">{t(saveStatus==='saved'?'Saved':saveStatus==='saving'?'Saving…':'Save failed')}{saveStatus==='failed'&&<button onClick={()=>{if(completionRetry.current)void persistFinal(completionRetry.current);else onSaveRetry();}}>{t('Retry saving')}</button>}</p>
           {coachEnabled&&researchVisible&&<div className="coach-mode"><label>{t("Coach mode")}<select aria-label={t("Coach mode")} value={mode} onChange={e=>{research.event('CONFIG_CHANGED',{systemAction:'MODE_'+e.target.value.toUpperCase()});setMode(e.target.value as 'auto'|'deepseek'|'demo');setResponseMode(undefined)}}><option value="auto">{t("Auto · AI when available")}</option><option value="deepseek">{t("DeepSeek · real AI only")}</option><option value="demo">{t("Demo · local practice")}</option></select></label><span>{responseMode==='demo'?t("Demo response · local guidance"):responseMode==='ai'?t("DeepSeek · real AI response"):mode==='deepseek'?t("DeepSeek only · errors allow retry."):t("Practice with Demo when AI is unavailable.")}</span></div>}
-          {canContinue&&!completed.includes(active)&&!readyDismissed[active]&&<section className="rail-section checkpoint-ready" role="status"><p>{locale==='zh-CN'?'这一步已经够用了，可以进入下一步啦！':'You have enough to continue to the next step.'}</p><p>{readinessCopy[active][locale==='zh-CN'?0:1]}</p><button onClick={()=>setReadyDismissed(prev=>({...prev,[active]:true}))}>{locale==='zh-CN'?'我还想再想一想':'I want to think some more'}</button></section>}
+
           <AIChat
             researchVisible={researchVisible}
             recommendation={!finished&&adaptive.showRecommendation?<SupportRecommendation decision={{...adaptive.decision,state:{...adaptive.decision.state,language:locale==='zh-CN'?'zh':'en'}}} onChoice={chooseSupport} disabled={(pending.length>0||research.busy)}/>:undefined}

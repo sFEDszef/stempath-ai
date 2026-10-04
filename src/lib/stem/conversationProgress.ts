@@ -119,6 +119,7 @@ export function conversationHistory(request:Pick<ChatRequest,'task'|'stage'>,mes
 function normalize(text:string){return text.toLowerCase().replace(/___|[\p{P}\p{S}\s]/gu,'').replace(/可以先填一小句|换个简单说法|我们只想一小步|tryonesmallsentence|letssayitmoresimply/g,'');}
 export function repeatsAnsweredQuestion(text:string,request:ChatRequest){
  if(request.intent==='challenge'||request.intent==='evaluate-claim')return false;
+ if(!/[?？]/.test(text)&&!text.includes('___')&&!/A[.)、][\s\S]*B[.)、]/.test(text))return false;
  const progress=conversationProgress(request);
  if(progress.choiceAnswer&&(answeredChoice(progress.choiceAnswer,text)||(/还是|\bor\b|A[.)、][\s\S]*B[.)、]/i.test(text)&&normalize(text).includes(normalize(progress.choiceAnswer)))))return true;
  const target=questionTarget(request.stage,text);

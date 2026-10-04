@@ -37,9 +37,9 @@ describe('support policy v2',()=>{
   const start=adaptiveDemo({...base,level:3,message:"I don't know"}).text;
   const next=adaptiveDemo({...base,level:3,history:[{role:'assistant',text:start}],message:'The task asks me to build a wind-powered car.'}).text;
   expect(next).toContain('enough for this step');
-  expect(adaptiveDemo({...base,level:3,stageReady:true,history:[{role:'assistant',text:start},{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'I want to think more.'}).text).toContain('count as success');expect(base.artifacts).toEqual({});
+  expect(adaptiveDemo({...base,level:3,stageReady:true,history:[{role:'assistant',text:start},{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'I want to think more.'}).text).toContain('Go to the Next Step');expect(base.artifacts).toEqual({});
   const changed=adaptiveDemo({...base,level:2,intent:'support-change',stageReady:true,previousLevel:3,history:[{role:'student',text:'The task asks me to build a wind-powered car.'}],message:'Please adjust guidance.'}).text;
-  expect(changed).toContain('count as success');
+  expect(changed).toContain('Go to the Next Step');
  });
  it.each([1,2,3] as const)('does not repeat the last question after repeated confusion at %s',level=>{
   const first=adaptiveDemo({...base,level}).text;
