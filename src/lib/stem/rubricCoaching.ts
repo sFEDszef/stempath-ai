@@ -13,8 +13,8 @@ export function rubricQuestion(request:ChatRequest,zh:boolean){
  const recent=request.history.filter(m=>m.role==='assistant').slice(-5).map(m=>m.text);
  if(recent.some(t=>t.includes(q))){
   const alternatives=missing?.kind==='ACTUAL_TRIAL_2'
-   ?zh?['目前说清楚的是第一次结果。等你实际再试一次，告诉我第二次测到或看到什么。','第二次真实尝试的结果还没有记下来。你可以先去试，回来再说第二次的观察。','重复第一次的结果不能代替另一次尝试。实际完成第二次后，你测到或看到什么？']
-      :['We have the first result. After you actually try again, tell me what you measured or observed on the second trial.','The second real trial is not recorded yet. You can try it first, then return with your second observation.','Repeating the first result is not another trial. After completing a second real trial, what did you measure or observe?']
+   ?zh?['目前说清楚的是第一次结果。等你实际再试一次，第二次测到或看到什么？','第二次真实尝试的结果还没有记下来。你可以先去试，回来后第二次的观察是什么？','重复第一次的结果不能代替另一次尝试。实际完成第二次后，你测到或看到什么？']
+      :['We have the first result. After you actually try again, what did you measure or observe on the second trial?','The second real trial is not recorded yet. You can try it first; what is your observation after returning from the second trial?','Repeating the first result is not another trial. After completing a second real trial, what did you measure or observe?']
    :missing
     ?zh?[`先补上这一小点：${q}`,`我们仍需要这个实际信息：${q}`,`换个角度继续想这一个问题：${q}`]
        :[`Let’s add this missing part: ${q}`,`We still need this information: ${q}`,`Let’s approach this one question again: ${q}`]

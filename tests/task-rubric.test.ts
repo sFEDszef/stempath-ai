@@ -80,10 +80,23 @@ describe('same-request semantic classification and natural coaching',()=>{
     const question=rubricQuestion({...r,history:prompts.map(text=>({role:'assistant' as const,text}))},zh);
     expect(question).toMatch(zh?/第二次/:/second/i);
     expect(question).toMatch(zh?/实际|真实/:/actual|real/i);
+    expect(question.match(/[?？]/g)).toHaveLength(1);
+    expect(question).toMatch(/[?？]$/);
     prompts.push(question);
    }
    expect(new Set(prompts).size).toBe(4);
   }
+ });
+ it('normalizes a repeated live-provider trial prompt without losing the successful round',async()=>{
+  vi.stubEnv('DEEPSEEK_API_KEY','test-only');
+  const r=rubricRequest('test',task,Array(5).fill('第一次实际测到小车跑了2.1米，还没达到3米。'));
+  const question=rubricQuestion(r,true);
+  r.history=[{role:'assistant',text:question}];
+  vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:question,readiness:{satisfiedCriteria:[]}})}}]})));
+  const result=await deepseekProvider(r);
+  expect(result.readiness).toMatchObject({ready:false,meaningfulRounds:5,missingCriteria:['ACTUAL_TRIAL_2']});
+  expect(result.text).toMatch(/第二次/);
+  expect(fetch).toHaveBeenCalledTimes(1);
  });
  it('varied prompts continue targeting the missing goal instead of generic examples',()=>{
   const r=rubricRequest('understand',task,Array(5).fill('要做一个用风走的小车，用老师给的材料。'));
