@@ -21,6 +21,19 @@ describe('required stage transition regression',()=>{
   const response=await deepseekProvider(base);expect(response).toMatchObject({mode:'ai',readiness:{ready:true,source:'AI_SEMANTIC'}});
   expect(response.text).toContain('进入下一阶段');expect(response.text).not.toMatch(/[?？]|改哪个|还想继续/);expect(fetch).toHaveBeenCalledTimes(1);
  });
+ it.each([
+  {stage:'understand' as const,intent:'support-change' as const,message:'请调整帮助。',history:[{role:'assistant' as const,text:'这个任务要你做什么？'}],reply:'好的，我会一步一步带你想。这个任务要你做什么？'},
+  {stage:'test' as const,intent:'chat' as const,message:'我觉得下一次可能会跑6米。',history:[{role:'assistant' as const,text:'你实际测到或看到什么结果？'}],reply:'你觉得能跑6米。你准备怎么改小车？'}
+ ])('bounded $stage coaching is repaired without another paid call or false readiness',async scenario=>{
+  vi.stubEnv('DEEPSEEK_API_KEY','test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:scenario.reply,readiness:{ready:false,missing:scenario.stage==='test'?'ACTUAL_RESULT':'BASIC_TASK_GOAL'}})}}]})));
+  const request={...base,...scenario,stageReady:false},response=await deepseekProvider(request);
+  expect(response).toMatchObject({mode:'ai',readiness:{ready:false},suggestions:[]});expect(pedagogicallyValid(response.text,request)).toBe(true);expect(fetch).toHaveBeenCalledTimes(1);
+  expect(response.text).not.toContain('进入下一阶段');expect(response.text).not.toContain('准备怎么改');
+ });
+ it('bounded scaffolds still reject unsafe generated output',async()=>{
+  vi.stubEnv('DEEPSEEK_API_KEY','test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'1. Build the body\n2. Add wheels',readiness:{ready:false,missing:'ACTUAL_RESULT'}})}}]})));
+  await expect(deepseekProvider({...base,stage:'test',message:'我觉得会跑6米',history:[]})).rejects.toMatchObject({code:'pedagogy'});expect(fetch).toHaveBeenCalledTimes(1);
+ });
  it('rejects an advancement claim without actual Build evidence',()=>{
   const r={...base,message:'我明天才做',history:[]};expect(pedagogicallyValid('现在你已经可以进入下一阶段了。你准备改哪个地方？',r)).toBe(false);expect(demoProvider(r).readiness?.ready).toBe(false);
  });

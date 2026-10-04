@@ -17,11 +17,15 @@ export function buildDeepSeekMessages(request:ChatRequest) {
  ];
 }
 /** A conservative format check, not a semantic safety guarantee. Never repair with another paid call. */
-export function pedagogicallyValid(text:string,request:ChatRequest) {
+function safeCoachText(text:string) {
  if(/(?:touch|connect).*?(?:mains|live wire)|mix.*bleach.*ammonia|触摸带电|混合漂白/i.test(text))return false;
  if(text.length>1800||/```/.test(text))return false;
  // Reject turnkey construction and explicit invented findings, even when numbered.
  if(/(?:^|\n)\s*(?:\d+[.)、]|step\s*\d|步骤\s*\d)\s*(?:build|add|attach|cut|mount|安装|制作|剪)|your (?:final answer|conclusion|reflection) is|我的结论是|完整(?:设计|实验方案)|invented (?:data|observations)|编造(?:数据|观察)/i.test(text))return false;
+ return true;
+}
+export function pedagogicallyValid(text:string,request:ChatRequest) {
+ if(!safeCoachText(text))return false;
  if(request.intent==='challenge')return text.length<=500&&!/[?？]/.test(text);
  if(request.stageReady||conversationProgress(request).ready)return !/[?？]/.test(text)&&!/留下|留在|继续想|再想一想|兴趣继续|stay|keep thinking|explore more/i.test(text)&&/下一阶段|完成项目|next (?:step|stage)|finish.*project/i.test(text)&&text.length<600;
  if(repeatsAnsweredQuestion(text,request))return false;
@@ -88,10 +92,15 @@ export async function deepseekProvider(request:ChatRequest):Promise<CoachRespons
  const semantic=semanticReadiness(assessment,request),readiness=semantic.ready?semantic:requestReadiness(request);
  // Keep the readiness verdict and learner-facing action in agreement. A validated
  // READY response is a transition, not another generated design question.
- if(readiness.ready){
-  if(/(?:^|\n)\s*(?:\d+[.)、]|step\s*\d|步骤\s*\d)\s*(?:build|add|attach|cut|mount|安装|制作|剪)|your (?:final answer|conclusion|reflection) is|我的结论是|完整(?:设计|实验方案)|invented (?:data|observations)|编造(?:数据|观察)/i.test(text))throw new ProviderError('pedagogy');
+ const progress=conversationProgress(request);
+ const boundedPhysicalTurn=(request.stage==='build'||request.stage==='test')&&(progress.futureIntent||progress.prediction||progress.notDone);
+ // Support changes and prospective physical turns have narrow policy scaffolds.
+ // If generated formatting fails, render that scaffold rather than sending a
+ // paid repair request or losing the student's actual-evidence requirement.
+ if(!safeCoachText(text))throw new ProviderError('pedagogy');
+ if(readiness.ready||(!pedagogicallyValid(text,request)&&(request.intent==='support-change'||boundedPhysicalTurn))){
   const zh=languageOf(request.message,request.interfaceLanguage==='zh-CN'?'zh':'en')==='zh';
-  text=youngReply({...request,stageReady:true},zh);
+  text=youngReply({...request,stageReady:readiness.ready||request.stageReady},zh);
  }
  if(!pedagogicallyValid(text,{...request,stageReady:readiness.ready||request.stageReady}))throw new ProviderError('pedagogy');
  return {text,readiness,suggestions:[],mode:'ai',metadata:{...metadata,model:data.model,compliance:'COMPLIANCE_CHECK_PASSED'}};
