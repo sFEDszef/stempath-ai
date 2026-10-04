@@ -39,6 +39,11 @@ describe('task-grounded bilingual coaching',()=>{
   expect(youngReply(r,true)).toContain('我现在想改轮子');
   expect(concreteQuestion({...r,message:'',history:[]},'AT_LEAST_TWO_IDEAS',true)).not.toContain('刚才');
  });
+ it('does not mistake the student’s own example for an AI Level 1 answer list',()=>{
+  const r={...base,stage:'imagine' as const,message:'比如我想试大一点的帆'};
+  expect(pedagogicallyValid(youngReply(r,true),r)).toBe(true);
+  expect(youngReply(r,true)).toContain('除了帆');
+ });
  it('does not treat a support control message as a prior learner idea',()=>{
   const r={...base,stage:'imagine' as const,intent:'support-change' as const,message:'Please adjust guidance.'};
   const reply=youngReply(r,false);

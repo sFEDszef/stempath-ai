@@ -2,7 +2,7 @@ import 'server-only';
 import {conversationProgress,evidenceSlots,repeatsAnsweredQuestion} from '@/lib/stem/conversationProgress';
 import {readinessInstruction,semanticReadiness,requestReadiness} from '@/lib/stem/readiness';
 import {youngReply} from '@/lib/stem/youngLearner';
-import {concreteLanguageValid} from '@/lib/stem/concreteCoaching';
+import {concreteLanguageValid,concreteAcknowledgement} from '@/lib/stem/concreteCoaching';
 import {rubricQuestion} from '@/lib/stem/rubricCoaching';
 import {languageOf} from '@/lib/pedagogy/signals';
 import {boundedHistory} from '@/lib/stem/context';
@@ -41,12 +41,14 @@ export function pedagogicallyValid(text:string,request:ChatRequest) {
  if((request.stage==='build'||request.stage==='test')&&(progress.futureIntent||progress.prediction)&&!/[?？]/.test(text))return text.length<400&&/亲手试过.*回来|After trying.*come back/i.test(text);
  const questions=(text.match(/[?？]/g)??[]).length;
  if(questions!==1||!/[?？][”"']?$/.test(text))return false;
+ // A verified quotation of the student's own example is not an AI answer scaffold.
+ const coachOnly=text.replace(concreteAcknowledgement(request,languageOf(request.message,request.interfaceLanguage==='zh-CN'?'zh':'en')==='zh'),'');
  const body=request.intent==='support-change'?text.replace(/^[^?？\n]*?[。.!！]\s*/,''):text;
  const questionStart=body.search(/[^。.!！\n]*[?？]/);
  // Level 1 must offer something useful before the question, rather than pure questioning.
  if(request.level===1){
   if(!conversationProgress(request).ready&&/可以选择/.test(body))return false;
-  if(text.length>600||body.split(/\s+/).length>90||questionStart<=0||/for example|such as|例如|比如|___|(?:^|\n)\s*(?:\d+[.)、]|[ABC][.)])/i.test(body))return false;
+  if(text.length>600||body.split(/\s+/).length>90||questionStart<=0||/for example|such as|例如|比如|___|(?:^|\n)\s*(?:\d+[.)、]|[ABC][.)])/i.test(coachOnly))return false;
  }
  const structure=/___|(?:^|[\s\n:：])[AB][.)、]|sentence frame|partial (?:frame|structure)|可以先(?:填|分)|补全|分成|比较.*(?:标准|方面)/i.test(body);
  const progressed=progress.ready||request.stageReady||!!progress.choiceAnswer||progress.futureIntent||progress.prediction||progress.latest.some(Boolean)||request.history.some(m=>m.role==='assistant');

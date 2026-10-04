@@ -109,7 +109,7 @@ Open `/?research=1` for condition assignment, seeded tasks, local session traces
 
 Optional support recommendations appear beside the chat input. Adaptive support offers escalation after two consecutive uncertainty/help signals. At Level 2 or 3, two consecutive productive responses, including recent reasoning, evidence or critical evaluation, can offer fading. Accepting a recommendation or manually changing support immediately requests guidance at the chosen level; no level changes automatically.
 
-Under support policy v2, Level 1 provides a concrete clue and one manageable question; Level 2 adds a partial frame or choices; Level 3 provides a brief explanation and two or three thinking steps before one learner decision. LOW starts at Level 1 and disables proactive recommendations; ADAPTIVE and CUSTOM normally start at Level 2; HIGH starts at Level 3; NO_AI disables coaching. These are prototype heuristics, not validated measures of learning.
+Under support policy v2, Level 1 provides a concrete clue and one manageable question; Level 2 adds a partial frame or choices; Level 3 provides a brief explanation and two or three thinking steps before one learner decision. LOW starts at Level 1 and disables proactive recommendations; new normal projects, ADAPTIVE and CUSTOM normally start at Level 1 (CUSTOM can explicitly choose another initial level); HIGH starts at Level 3; NO_AI disables coaching. These are prototype heuristics, not validated measures of learning.
 
 ## DeepSeek pilot
 
