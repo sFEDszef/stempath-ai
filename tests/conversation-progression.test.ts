@@ -21,10 +21,10 @@ describe('cumulative conversation evidence, separate from records and readiness'
   const reply=demoProvider(base);
   expect(conversationProgress(base).slots).toEqual([false,true]);
   expect(reply.readiness?.ready).toBe(false);
-  expect(reply.text).toContain('你已经说出了看到的结果');
+  expect(reply.text).toContain('小车向前走了几米');
   expect(reply.text).not.toContain('我看到发生了： ___');
   expect(reply.text).not.toContain('做的时候，你看到什么？');
-  expect(reply.text).toContain('亲手做了哪一步');
+  expect(reply.text).toContain('实际为风力小车做了什么');
   expect(base.artifacts).toEqual({});
   const next=demoProvider(append(base,reply.text,'我装好帆以后放到风扇前试了一次。'));
   expect(next.readiness?.ready).toBe(false);expect(next.readiness?.meaningfulRounds).toBeLessThan(5);
@@ -82,11 +82,11 @@ describe('rubric READY transitions at all seven stages',()=>{
  });
  it('Level 3 advances to step 2 after completing step 1, rather than restarting three steps',()=>{
   const r={...base,stage:'understand' as const,level:3 as const,message:'不知道',history:[]};
-  const first=adaptiveDemo(r).text;expect(first).toContain('1. 找出任务要做的事');
+  const first=adaptiveDemo(r).text;expect(first).toContain('1. 看题目要你对风力小车做什么');
   const answer=append(r,first,'这个任务要让小车跑起来。');
   const ready=adaptiveDemo(answer).text;expect(ready).not.toContain('这一步已经够用了');
   const second=adaptiveDemo({...append(answer,ready,'我想留下多想一点。'),stageReady:true}).text;
-  expect(second).not.toContain('进入下一阶段');expect(second).toMatch(/[?？]/);expect(second).not.toContain('1. 找出任务要做的事');
+  expect(second).not.toContain('进入下一阶段');expect(second).toMatch(/[?？]/);expect(second).not.toContain('1. 看题目要你对风力小车做什么');
  });
  it('both conversation slots lead to optional exploration without re-asking either',()=>{const r={...base,stageReady:true,history:[...base.history,{role:'student' as const,text:base.message},{role:'assistant' as const,text:'你亲手试过哪一小步？'},{role:'student' as const,text:'我把帆装上去了。'}],message:'我想多想一点'};for(const level of [1,2,3] as const){const reply=adaptiveDemo({...r,level});expect(conversationProgress(r).slots).toEqual([true,true]);expect(repeatsAnsweredQuestion(reply.text,{...r,level})).toBe(false);expect(pedagogicallyValid(reply.text,{...r,level})).toBe(true);}});
  it('Level 2 never repeats an answered frame',()=>{
@@ -122,7 +122,7 @@ describe('provider anti-repetition, safe fallback and suggestions',()=>{
   vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:base.history[0].text,readiness:{ready:false,missing:'ACTUAL_ATTEMPT'}})}}]})));
   const reply=await respond(base);
   expect(reply.metadata).toMatchObject({provider:'deepseek',compliance:'COMPLIANCE_CHECK_PASSED'});
-  expect(reply.text).toContain('你已经说出了看到的结果');expect(reply.text).not.toContain('我看到发生了： ___');
+  expect(reply.text).toContain('小车向前走了几米');expect(reply.text).not.toContain('我看到发生了： ___');
   expect(fetch).toHaveBeenCalledTimes(1);
  });
  it.each(['zh','en'] as const)('ordinary suggestions remain empty in %s',language=>{for(const stage of Object.keys(evidenceSlots) as StageId[])expect(suggestedReplies(language,{...base,stage})).toEqual([]);});
@@ -130,6 +130,6 @@ describe('provider anti-repetition, safe fallback and suggestions',()=>{
   let s=startSession(base.task,conditionConfig());
   s=recordEvent(s,'MESSAGE_SENT',{messageText:base.message});
   s=recordEvent(s,'AI_RESPONSE',{messageText:adaptiveDemo(base).text});
-  for(const output of [exportJSON(s),exportCSV(s)]){expect(output).not.toContain(base.message);expect(output).not.toContain('你已经说出了看到的结果');}
+  for(const output of [exportJSON(s),exportCSV(s)]){expect(output).not.toContain(base.message);expect(output).not.toContain('小车向前走了几米');}
  });
 });

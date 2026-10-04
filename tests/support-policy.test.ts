@@ -23,8 +23,8 @@ describe('support policy v2',()=>{
    // The former question-only output cannot satisfy these format and agency checks.
    expect(text[0]).toMatch(/simply|简单/);expect(text[0]).not.toContain('___');
    expect(text[1]).toContain('___');expect(text[1]).not.toMatch(/\n1\./);
-   expect(text[2]).toMatch(/\n1\.[\s\S]*\n2\.[\s\S]*\n3\./);expect(text[2]).toContain('A.');
-   expect(text[2]).toMatch(/just one|只选一个/);
+   expect(text[2]).toMatch(/\n1\.[\s\S]*\n2\.[\s\S]*\n3\./);expect(text[2]).toMatch(/car|小车/);
+   expect(text[2]).toMatch(/first small question|第一个小问题/);
    for(const [i,response] of text.entries()){
     expect(response.match(/[?？]/g)).toHaveLength(1);
     expect(pedagogicallyValid(response,{...request,level:(i+1) as SupportLevel})).toBe(true);
@@ -46,11 +46,11 @@ describe('support policy v2',()=>{
   const next=adaptiveDemo({...base,level,history:[{role:'assistant',text:first}]}).text;
   expect(next).not.toBe(first);expect(next.match(/[?？]/g)).toHaveLength(1);
  });
- it.each([['LOW_SUPPORT',1],['ADAPTIVE_SUPPORT',2],['HIGH_SUPPORT',3],['CUSTOM',2],['NO_AI',2]] as const)('%s starts at %s', (condition,level)=>{
+ it.each([['LOW_SUPPORT',1],['ADAPTIVE_SUPPORT',1],['HIGH_SUPPORT',3],['CUSTOM',1],['NO_AI',1]] as const)('%s starts at %s', (condition,level)=>{
   expect(initialLevel(condition)).toBe(level);expect(startSession(base.task,conditionConfig(condition)).supportLevel).toBe(level);
  });
- it('normal projects start at 2; CUSTOM can explicitly configure its initial level',()=>{
-  expect(newProject(base.task)).toMatchObject({level:2,supportPolicyVersion:'v2'});
+ it('normal projects start at 1; CUSTOM can explicitly configure its initial level',()=>{
+  expect(newProject(base.task)).toMatchObject({level:1,supportPolicyVersion:'v2'});
   const custom=parseResearchConfig({...conditionConfig('CUSTOM'),initialSupportLevel:3});
   expect(startSession(base.task,custom).supportLevel).toBe(3);expect(startSession(base.task,custom).configSnapshot.initialSupportLevel).toBe(3);
   expect(initialLevel('LOW_SUPPORT',3)).toBe(1);expect(()=>parseResearchConfig({...custom,initialSupportLevel:4})).toThrow();
@@ -83,7 +83,7 @@ describe('support policy v2',()=>{
   }
  });
  it('accepts thinking decomposition while rejecting answer generation and whole procedures',()=>{
-  expect(pedagogicallyValid('Look at the task goal.\n1. Find one action.\n2. Find what counts as success.\n3. Choose a way to check.\nNow only do the first step: which action would you start with?',{...base,level:3})).toBe(true);
+  expect(pedagogicallyValid('Look at the wind-powered car task.\n1. Find what pushes the car.\n2. Find the travel distance requirement.\n3. Find one rule.\nNow only do the first step: what pushes the car?',{...base,level:3})).toBe(true);
   for(const text of ['1. Build the body\n2. Attach wheels\n3. Add a sail\nWill you use this design?','Your conclusion is that a larger sail is always best. What do you think?','我的结论是小车成功了。你同意吗？','What is the goal? What are the constraints?'])expect(pedagogicallyValid(text,{...base,level:3})).toBe(false);
   expect(pedagogicallyValid('What is the goal?',{...base,level:1})).toBe(false);
   expect(pedagogicallyValid('Look for the goal. What is it?',{...base,level:2})).toBe(false);

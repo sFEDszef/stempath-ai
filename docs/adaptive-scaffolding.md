@@ -1,6 +1,6 @@
 # STEMPath AI v0.5.1 — Adaptive Scaffolding Engine
 
-Support ladder update: the historical level/prompt descriptions below are superseded by [support policy v2](support-policy-v2.md), with default Level 2, new Level 3 rescue scaffolds and young-learner-v4. Existing research archives retain their original v1 semantics.
+Support ladder update: the historical level/prompt descriptions below are superseded by [support policy v2](support-policy-v2.md), with new-project default Level 1, Level 3 rescue scaffolds and task-grounded young-learner coaching. Existing research archives retain their original v1 semantics.
 
 
 ## Control pipeline

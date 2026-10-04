@@ -19,7 +19,7 @@ describe('stage-consistent physical dialogue',()=>{
  it.each([1,2,3] as const)('remembers the exact reported choice and never upgrades it at level %s',level=>{
   let r={...base,level};let reply=demoProvider(r);
   expect(conversationProgress(r)).toMatchObject({choiceAnswer:'加高',futureIntent:true,ready:false});
-  expect(reply.text).toContain('你已经选了“加高”');expect(reply.text).toContain('已经亲手试过');
+  expect(reply.text).toContain('加高');expect(reply.text).toContain('已经亲手试过');
   expect(reply.text).not.toMatch(/A\.|B\.|加高.*还是.*加宽/);expect(reply.readiness?.ready).toBe(false);
   r=next(r,reply.text,'加高一点');reply=demoProvider(r);
   expect(reply.text).toContain('等你亲手试过');expect(reply.text).not.toMatch(/A\.|加高.*还是.*加宽/);expect(reply.readiness?.ready).toBe(false);
@@ -44,16 +44,16 @@ describe('stage-consistent physical dialogue',()=>{
  });
  it('rejects provider future-planning and repeated selected choices in Build',()=>{
   for(const text of ['你已有方向。你打算把风挡加高还是加宽？','你选了加高。A. 加高 B. 加宽。你选哪个？'])expect(pedagogicallyValid(text,base)).toBe(false);
-  expect(pedagogicallyValid('你已经选了加高。你已经亲手试过这一步了吗？',base)).toBe(true);
+  expect(pedagogicallyValid('你已经选了加高风挡。你已经亲手试过小车了吗？',base)).toBe(true);
  });
  it('accepts a concise real-provider acknowledgement and returns no chips',async()=>{
-  vi.stubEnv('DEEPSEEK_API_KEY','fake-stage-test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'你已经选了加高。你已经亲手试过这一步了吗？',readiness:{ready:false,missing:'ACTUAL_ATTEMPT'}})}}]})));
+  vi.stubEnv('DEEPSEEK_API_KEY','fake-stage-test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'你已经选了加高风挡。你已经亲手试过小车了吗？',readiness:{ready:false,missing:'ACTUAL_ATTEMPT'}})}}]})));
   expect(await deepseekProvider(base)).toMatchObject({mode:'ai',suggestions:[],readiness:{ready:false}});
   const prompt=buildDeepSeekMessages(base);expect(prompt[0].content).toContain('Do not generate learner quick replies');expect(JSON.parse(prompt[1].content).conversationProgress).toMatchObject({answeredChoice:true,futureIntent:true});
  });
  it('Auto fallback retains intent and physical pause semantics without another call',async()=>{
   vi.stubEnv('AI_PROVIDER','deepseek');vi.stubEnv('DEEPSEEK_API_KEY','fake-stage-test-key');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:base.history[0].text})}}]})));
-  const reply=await respond({...base,mode:'auto'});expect(reply).toMatchObject({mode:'ai',suggestions:[],readiness:{ready:false}});expect(reply.text).toContain('你已经选了');expect(fetch).toHaveBeenCalledTimes(1);
+  const reply=await respond({...base,mode:'auto'});expect(reply).toMatchObject({mode:'ai',suggestions:[],readiness:{ready:false}});expect(reply.text).toContain('加高');expect(fetch).toHaveBeenCalledTimes(1);
  });
 });
 describe('free-text only UI, including saved historical suggestions',()=>{

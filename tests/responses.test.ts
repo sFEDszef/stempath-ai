@@ -10,7 +10,7 @@ it('sends current task, records and history only to DeepSeek',async()=>{
  const fetch=vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:'Compare actual evidence: trial A ___; trial B ___. Which recorded evidence would you compare first?'}}]}));
  vi.stubGlobal('fetch',fetch);
  const task=demoTasks[4];const artifacts={test:{Observations:'Growth measurements varied across repeated observations.'}};
- expect((await deepseekProvider({task,artifacts,completed:['understand'],stage:'test',level:2,message:'How can I check this?',history:[{role:'student',text:'I measured growth.'}]})).text).toContain('Which recorded evidence');
+ expect((await deepseekProvider({task,artifacts,completed:['understand'],stage:'test',level:2,message:'How can I check this?',history:[{role:'student',text:'I measured growth.'}]})).text).toContain('seedling');
  const call=fetch.mock.calls[0] as unknown as [unknown,RequestInit];
  const body=JSON.parse(call[1].body as string);
  expect(body.model).toBe('deepseek-flash');expect(body.messages[0].content).toContain('Partial scaffolding');expect(body.messages[0].content).toContain('untrusted learning data');

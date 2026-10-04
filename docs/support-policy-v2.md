@@ -16,7 +16,7 @@ On confusion, Level 1 rephrases with a clue and easier question; Level 2 adds a 
 
 ## Defaults and adaptive choices
 
-Normal new projects and ADAPTIVE_SUPPORT begin at 2; LOW_SUPPORT begins at 1; HIGH_SUPPORT begins at 3. CUSTOM defaults to 2 and may explicitly set `initialSupportLevel` to 1, 2 or 3. NO_AI never produces coaching regardless of the stored support number. The initial level override only applies to CUSTOM, so it cannot silently change the preset study conditions.
+Normal new projects and ADAPTIVE_SUPPORT begin at 1; LOW_SUPPORT begins at 1; HIGH_SUPPORT begins at 3. CUSTOM defaults to 1 and may explicitly set `initialSupportLevel` to 1, 2 or 3. NO_AI never produces coaching regardless of the stored support number. The initial level override only applies to CUSTOM, so it cannot silently change the preset study conditions.
 
 Repeated difficulty offers 2→3; two recent productive responses including reasoning, evidence or critical evaluation can offer 2→1. At 3, fading offers 3→2. Offers remain optional: there is no automatic level change or judgement of mastery. Support acknowledgements describe the actual new intensity and distinguish the two fading transitions.
 
@@ -35,3 +35,11 @@ An old server research session is ended with `SUPPORT_POLICY_CHANGE` (unless alr
 ## Validation limits
 
 Tests cover all seven stages, G3–4/G5–6/G7+, Chinese/English confusion, one immediate question, relative scaffold strength, boundaries, defaults, optional adaptive transitions, one-time local/server migration and archive isolation. Provider tests use mocked calls; no credentials or paid model calls are required. The output format guard checks obvious violations and scaffold shape; it is not a semantic guarantee. Live model pedagogical quality still needs educator evaluation.
+
+## Concrete coaching language
+
+The bilingual question bank in `src/lib/stem/concreteCoaching.ts` anchors each criterion to the current task object, action or measurement. It covers wind cars, paper bridges, water filtration, warm-water insulation and seedling growth. Other injected tasks use their own title and requirements, rather than inheriting wind-car vocabulary. Student-mentioned parts and measurements remain learner-owned; no measurements or choices are invented. G3–4 receive one concrete question; G5–6 may hear a technical term only after its plain-language explanation.
+
+`rubricCoaching.ts` selects the first missing frozen criterion, or a concrete deepening question before the existing five-round threshold. `youngLearner.ts` uses the same bank for demo replies and stage welcomes. DeepSeek receives a concrete next-question cue; visibly vague output is normalized in the same request, without a second paid call. This language check does not establish scientific correctness or change readiness.
+
+Changing the new-project default does not change support semantics: policy remains v2. Existing v2 projects retain their stored Level 2 or 3, and historical session metadata is not rewritten. New session snapshots record their actual starting level. Ordinary answer chips remain removed; stronger scaffolds appear selectively rather than restarting every turn.

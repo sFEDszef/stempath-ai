@@ -9,7 +9,7 @@ import {exportJSON,exportCSV} from '@/lib/research/export';
 import {recordEvent,startSession} from '@/lib/research/session';
 import type {ChatRequest} from '@/types';
 const base:ChatRequest={stage:'understand',level:1,message:'我不知道从哪里开始。',history:[],task:demoTasks[0],artifacts:{},completed:[]};
-const successful=(text='先看题目里怎样才算成功。你能找到一个成功标准吗？')=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:text}}],usage:{prompt_tokens:700,completion_tokens:15,total_tokens:715}});
+const successful=(text='先看小车题目里怎样才算成功。小车要达到什么要求？')=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:text}}],usage:{prompt_tokens:700,completion_tokens:15,total_tokens:715}});
 beforeEach(()=>{vi.stubEnv('DEEPSEEK_API_KEY','test-secret-never-real');vi.stubEnv('AI_PROVIDER','deepseek');vi.stubEnv('AI_MODEL','deepseek-flash');vi.stubEnv('DEEPSEEK_BASE_URL','https://api.deepseek.com');vi.stubGlobal('fetch',vi.fn(async()=>successful()));});
 afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();vi.useRealTimers();});
 describe('provider modes and research boundaries',()=>{
@@ -28,7 +28,7 @@ describe('server request and pedagogy',()=>{
  it.each([1,2,3] as const)('preserves chosen level %s despite productive history',level=>{const system=buildDeepSeekMessages({...base,level,history:[{role:'student',text:'I measured it because evidence matters.'},{role:'student',text:'The results support my prediction because it repeated.'}]})[0].content;expect(system).toContain(`"supportLevel":${level}`);});
  it.each(demoTasks)('isolates active task $title',task=>{const input=buildDeepSeekMessages({...base,task});expect(JSON.parse(input[1].content).task.title).toBe(task.title);if(task.id!==base.task.id)expect(input[1].content).not.toContain(base.task.title);});
  it.each(['先制作车身。然后安装车轮。最后装帆。','1. Build the body\n2. Add wheels','For example, use a sail. What will you do?','你可以选择大帆或者小帆，你选哪个？','What is the goal? What is the constraint?'])('rejects Level 1 violation %s',text=>expect(pedagogicallyValid(text,base)).toBe(false));
- it('accepts each support format and localized support acknowledgement',()=>{expect(pedagogicallyValid('先看题目里怎样才算成功。你能找到一个成功标准吗？',base)).toBe(true);expect(pedagogicallyValid('好的，减少提示。目标可以用观察或测量检查。你想检查什么？',{...base,intent:'support-change',previousLevel:2})).toBe(true);expect(pedagogicallyValid('可以先填一小句：我准备测量___。你想填什么？',{...base,level:2})).toBe(true);expect(pedagogicallyValid('先只看任务目标。\n1. 找目标\n2. 找成功标准\n3. 选检查方法\n现在只做第一步：你找到哪个目标？',{...base,level:3})).toBe(true);});
+ it('accepts each support format and localized support acknowledgement',()=>{expect(pedagogicallyValid('先看小车题目里怎样才算成功。小车要达到什么要求？',base)).toBe(true);expect(pedagogicallyValid('好的，减少提示。小车行驶距离可以量出来。你想怎样检查小车的距离？',{...base,intent:'support-change',previousLevel:2})).toBe(true);expect(pedagogicallyValid('可以先填一小句：我准备测量小车的___。你想测量小车的什么？',{...base,level:2})).toBe(true);expect(pedagogicallyValid('先只看小车任务。\n1. 找小车要做的事\n2. 找距离要求\n3. 找材料限制\n现在只做第一步：小车靠什么前进？',{...base,level:3})).toBe(true);});
  it('challenge is a short testable claim; evaluation does not label it correct',()=>{expect(buildDeepSeekMessages({...base,intent:'challenge'})[0].content).toContain('unverified, testable claim');expect(pedagogicallyValid('Repeating one trial always gives the same result.',{...base,intent:'challenge'})).toBe(true);expect(pedagogicallyValid('You are correct. What evidence do you have?',{...base,intent:'evaluate-claim',level:2})).toBe(false);});
 });
 describe('sanitized errors and bounded paid calls',()=>{

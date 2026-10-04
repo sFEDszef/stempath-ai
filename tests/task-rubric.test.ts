@@ -104,11 +104,11 @@ describe('same-request semantic classification and natural coaching',()=>{
    const first=rubricQuestion(r,zh);
    const next=rubricQuestion({...r,history:[{role:'assistant',text:first}]},zh);
    expect(next).not.toBe(first);
-   expect(next).toMatch(zh?/目标/:/goal/);
+   expect(next).toMatch(zh?/距离/:/distance/);
   }
  });
- it('asks a missing concept after five incomplete rounds without exposing a counter',()=>{const r=rubricRequest('understand',task,Array(6).fill('要做一个用风走的小车，只能用老师给的材料。'));const result=demoProvider(r);expect(result.readiness?.ready).toBe(false);expect(result.text).toMatch(/目标/);expect(result.text).not.toMatch(/回合|轮数|rounds|3\/5/);});
- it('rubric complete before five prompts useful checking without a modal/READY claim',()=>{const r=rubricRequest('understand',task,['要做一个用风走的小车，用老师的材料跑到3米。']);const result=demoProvider(r);expect(result.readiness).toMatchObject({ready:false,meaningfulRounds:1,missingCriteria:[]});expect(result.text).toContain('检查');});
+ it('asks a missing concept after five incomplete rounds without exposing a counter',()=>{const r=rubricRequest('understand',task,Array(6).fill('要做一个用风走的小车，只能用老师给的材料。'));const result=demoProvider(r);expect(result.readiness?.ready).toBe(false);expect(result.text).toMatch(/距离/);expect(result.text).not.toMatch(/回合|轮数|rounds|3\/5/);});
+ it('rubric complete before five prompts useful checking without a modal/READY claim',()=>{const r=rubricRequest('understand',task,['要做一个用风走的小车，用老师的材料跑到3米。']);const result=demoProvider(r);expect(result.readiness).toMatchObject({ready:false,meaningfulRounds:1,missingCriteria:[]});expect(result.text).toMatch(/小车.*距离/);});
  it('fifth success classifies in one paid call and normalizes READY',async()=>{vi.stubEnv('DEEPSEEK_API_KEY','test-only');vi.stubGlobal('fetch',vi.fn(async()=>Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content:JSON.stringify({reply:'你的理解已经可以进入下一步了。',readiness:{satisfiedCriteria:task.progressionCriteria!.understand.map(c=>c.id)}})}}]})));const result=await deepseekProvider(rubricRequest());expect(result.readiness?.ready).toBe(true);expect(result.text).toContain('进入下一阶段');expect(fetch).toHaveBeenCalledTimes(1);expect(result.metadata?.promptVersion).toBe('young-learner-v6');});
  it('provider receives frozen criteria and STEMPath-computed count, not executable criterion prompts',()=>{const payload=buildDeepSeekMessages(rubricRequest());expect(payload[0].content).toContain('task-rubric-v1');expect(payload[0].content).toContain('Never output hidden reasoning');const data=JSON.parse(payload[1].content);expect(data.conversationProgress.readiness.meaningfulRounds).toBe(5);expect(data.conversationProgress.frozenRubric).toEqual(task.progressionCriteria);});
 });

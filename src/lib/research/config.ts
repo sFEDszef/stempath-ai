@@ -24,7 +24,7 @@ export function parseResearchConfig(input: unknown): ResearchConfig {
  if(v.initialSupportLevel!==undefined){if(![1,2,3].includes(v.initialSupportLevel as number))throw Error("Invalid initial support level");result.initialSupportLevel=v.initialSupportLevel as SupportLevel;}
  return result;
 }
-export const initialLevel=(condition:Condition,customLevel?:SupportLevel):SupportLevel=>condition==='LOW_SUPPORT'?1:condition==='HIGH_SUPPORT'?3:condition==='CUSTOM'?(customLevel??2):2;
+export const initialLevel=(condition:Condition,customLevel?:SupportLevel):SupportLevel=>condition==='LOW_SUPPORT'?1:condition==='HIGH_SUPPORT'?3:condition==='CUSTOM'?(customLevel??1):1;
 export const aiEnabled=(config:ResearchConfig)=>config.condition!=='NO_AI';
 /** Research visibility is a convenience, not authentication. Never use it to protect secrets. */
 export function researchMode(search:string){const p=new URLSearchParams(search);return p.get('research')==='1'||p.get('debug')==='1';}
