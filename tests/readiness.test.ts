@@ -35,7 +35,7 @@ describe('durable readiness and research privacy',()=>{
  it('new policy does not relabel v4 research archives',()=>{const s=startSession(task,conditionConfig());delete s.readinessPolicyVersion;delete s.configSnapshot.readinessPolicyVersion;s.promptVersion='young-learner-v4';s.configSnapshot.promptVersion='young-learner-v4';const out=JSON.parse(exportJSON(s));expect(out.promptVersion).toBe('young-learner-v4');expect(out.manifest.readinessPolicyVersion).toBe('checkpoint-v1');});
 });
 describe('one structured provider request, independent pedagogy checks',()=>{
- const reply='你已经说出了这次任务大概要做什么。这一步已经够用了。你想进入下一阶段还是留下多想一点？';
+ const reply=demoProvider(base).text;
  beforeEach(()=>{vi.stubEnv('DEEPSEEK_API_KEY','not-a-real-test-key');vi.stubGlobal('fetch',vi.fn());});
  afterEach(()=>{vi.unstubAllGlobals();vi.unstubAllEnvs();});
  function output(content:string){vi.mocked(fetch).mockResolvedValue(Response.json({model:'deepseek-flash',choices:[{finish_reason:'stop',message:{content}}]}));}
@@ -47,14 +47,14 @@ describe('one structured provider request, independent pedagogy checks',()=>{
  it('NO_AI uses records and makes zero provider requests',async()=>{expect(assessLocalReadiness(task,'understand',{'understand':{'Problem statement':'让小车跑远一点'}}).ready).toBe(true);await expect(respond({...base,research:conditionConfig('NO_AI')})).rejects.toMatchObject({status:403});expect(fetch).not.toHaveBeenCalled();});
 });
 
-describe('one-time READY transition choices',()=>{
+describe('required READY transition, including restored projects',()=>{
  const ready={ready:true,criterion:'ONE_IDEA' as const,source:'DEMO' as const};
  it('opens only on false to true in the active unfinished stage',()=>{expect(shouldPromptReady('imagine','imagine',[],undefined,ready)).toBe(true);expect(shouldPromptReady('imagine','understand',[],undefined,ready)).toBe(false);expect(shouldPromptReady('imagine','imagine',[],undefined,{...ready,ready:false})).toBe(false);});
  it('ADVANCE records decision before completion and canonical entry',()=>{let s=enterStage(startSession(task,conditionConfig()),'imagine');s=recordEvent(s,'STAGE_READY_DECISION',{studentAction:'ADVANCE'});s=enterStage(completeStage(s,'imagine'),'plan');expect(s.events.slice(-3).map(e=>e.eventType)).toEqual(['STAGE_READY_DECISION','STAGE_COMPLETED','STAGE_ENTERED']);expect(s.completedStages).toContain('imagine');expect(s.currentStage).toBe('plan');});
  it('STAY never completes or enters another stage',()=>{const s=recordEvent(enterStage(startSession(task,conditionConfig()),'imagine'),'STAGE_READY_DECISION',{studentAction:'STAY'});expect(s.completedStages).toEqual([]);expect(s.currentStage).toBe('imagine');});
- it('later chatting cannot reopen a latched acknowledged stage',()=>expect(shouldPromptReady('imagine','imagine',[],{...ready,promptSeen:true},ready)).toBe(false));
- it('refresh preserves READY, promptSeen and manual progression without AI',()=>{const p=newProject(task);p.active='imagine';p.readiness.imagine={...ready,promptSeen:true};const next=parseProject(JSON.parse(JSON.stringify(p)));expect(next.readiness.imagine).toEqual(p.readiness.imagine);expect(shouldPromptReady('imagine',next.active,next.completed,next.readiness.imagine,ready)).toBe(false);expect(next.readiness.imagine?.ready).toBe(true);});
- it('completed revisits and already-READY legacy projects do not prompt',()=>{expect(shouldPromptReady('imagine','imagine',['imagine'],undefined,ready)).toBe(false);expect(shouldPromptReady('imagine','imagine',[],ready,ready)).toBe(false);});
+ it('prior acknowledgement cannot suppress the required transition',()=>expect(shouldPromptReady('imagine','imagine',[],{...ready,promptSeen:true},ready)).toBe(true));
+ it('refresh restores the required transition without an AI request',()=>{const p=newProject(task);p.active='imagine';p.readiness.imagine={...ready,promptSeen:true};const next=parseProject(JSON.parse(JSON.stringify(p)));expect(next.readiness.imagine).toEqual(p.readiness.imagine);expect(shouldPromptReady('imagine',next.active,next.completed,next.readiness.imagine,ready)).toBe(true);expect(next.readiness.imagine?.ready).toBe(true);});
+ it('completed revisits do not prompt, but unfinished legacy READY projects do',()=>{expect(shouldPromptReady('imagine','imagine',['imagine'],undefined,ready)).toBe(false);expect(shouldPromptReady('imagine','imagine',[],ready,ready)).toBe(true);});
  it('Reflect finishes without an eighth stage, with final copy in both languages',()=>{expect(readyPromptCopy(true,true).advance).toBe('完成项目');expect(readyPromptCopy(true,false).advance).toBe('Finish Project');let s=startSession(task,conditionConfig());for(const stage of Object.keys(readinessCriteria) as StageId[])s=completeStage(enterStage(s,stage),stage);s=finishSession(s);expect(s.completedStages).toHaveLength(7);expect(s.currentStage).toBe('reflect');expect(s.completedAt).toBeDefined();});
  it.each(['Escape','backdrop','close'])('%s dismissal has STAY semantics and no raw text',()=>{const s=recordEvent(startSession(task,{...conditionConfig(),storeMessageText:true}),'STAGE_READY_DECISION',{studentAction:'STAY',messageText:'Never store this',reasonCategory:'Never store this'});expect(s.events.at(-1)).toMatchObject({eventType:'STAGE_READY_DECISION',studentAction:'STAY'});expect(s.events.at(-1)).not.toHaveProperty('messageText');expect(s.events.at(-1)).not.toHaveProperty('reasonCategory');expect(s.completedStages).toEqual([]);});
 });
