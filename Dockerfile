@@ -1,4 +1,5 @@
-FROM node:24-bookworm-slim AS deps
+ARG NODE_IMAGE=node:24-bookworm-slim
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@11.19.0 --activate
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -14,7 +15,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1 PERSISTENCE_MODE=local AUTH_MODE=disabled
 RUN pnpm build
 
-FROM node:24-bookworm-slim AS runner
+FROM ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 RUN groupadd --system --gid 1001 nodejs && useradd --system --uid 1001 --gid nodejs nextjs

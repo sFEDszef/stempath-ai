@@ -1,0 +1,21 @@
+{
+  "node": {
+    "source": "docker.io/library/node:24-bookworm-slim",
+    "digest": "sha256:51b1100cc2a83d370c6a60952e3f2989c8a43159d0e38586e090f3b3326efefd",
+    "indexDigest": "sha256:d6aa754f16b3197301076f047b5def2f02ea1dbbc2ca920407d46d7ec7f87b20",
+    "platform": "linux/amd64",
+    "versions": {
+      "NODE_VERSION": "24.21.0"
+    }
+  },
+  "postgres": {
+    "source": "docker.io/library/postgres:17-bookworm",
+    "digest": "sha256:66aafa11cf15800a3c94763f7e11d1e7b2e37e5e84bc4ce027cb6e1e4bfaf4df",
+    "indexDigest": "sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
+    "platform": "linux/amd64",
+    "versions": {
+      "PG_MAJOR": "17",
+      "PG_VERSION": "17.11-1.pgdg12+2"
+    }
+  }
+}

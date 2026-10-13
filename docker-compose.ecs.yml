@@ -1,0 +1,50 @@
+# Separate ACR deployment recipe. Pulling is safe; startup/migration requires approval.
+# All services require the explicit ecs-pilot profile. No build or Docker Hub access.
+services:
+  postgres:
+    profiles: [ecs-pilot]
+    image: ${STEMPATH_POSTGRES_IMAGE:?Set a verified ACR PostgreSQL digest reference}
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: stempath
+      POSTGRES_USER: stempath
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD privately}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U stempath -d stempath']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    profiles: [ecs-pilot]
+    image: ${STEMPATH_MIGRATE_IMAGE:?Set a verified ACR migration digest reference}
+    platform: linux/amd64
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL with host postgres}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+  app:
+    profiles: [ecs-pilot]
+    image: ${STEMPATH_APP_IMAGE:?Set a verified ACR app digest reference}
+    platform: linux/amd64
+    ports:
+      - '127.0.0.1:3000:3000'
+    environment:
+      PERSISTENCE_MODE: postgres
+      AUTH_MODE: participant
+      STUDENT_TASK_MODE: ASSIGNED
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET privately}
+      TRUST_PROXY: 'false'
+      AI_PROVIDER: demo
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+volumes:
+  postgres_data:
+    name: ${STEMPATH_DATABASE_VOLUME:-stempath_acr_pilot_postgres_data}
