@@ -5,3 +5,7 @@ node_modules/
 *.tsbuildinfo
 .DS_Store
 out/
+deploy/*.env
+deploy/*.env.*
+!deploy/*.env.example
+release-manifest.json

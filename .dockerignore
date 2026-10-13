@@ -8,3 +8,6 @@ coverage
 out
 *.tsbuildinfo
 .pnpm-store
+deploy/*.env
+deploy/*.env.*
+release-manifest.json

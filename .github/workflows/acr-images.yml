@@ -1,0 +1,73 @@
+name: Build and distribute ACR test images
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Authenticate only first; publishing requires configured ACR credentials
+        required: true
+        default: verify-access
+        type: choice
+        options: [verify-access, build-and-push]
+permissions:
+  contents: read
+concurrency:
+  group: acr-test-images
+  cancel-in-progress: false
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+      ACR_NAMESPACE: stempathai
+      PERSISTENCE_MODE: local
+      AUTH_MODE: disabled
+      AI_PROVIDER: demo
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check registry configuration
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          python3 - <<'PY'
+          import os
+          registry = os.environ.get('ACR_REGISTRY', '')
+          if registry != 'crpi-a7nh7r2ht0me9dto.cn-shenzhen.personal.cr.aliyuncs.com':
+              raise SystemExit('Set ACR_REGISTRY to the Shenzhen public hostname verified in the ACR console.')
+          if not os.environ.get('ACR_USERNAME') or not os.environ.get('ACR_PASSWORD'):
+              raise SystemExit('Add ACR_USERNAME and ACR_PASSWORD repository Actions secrets.')
+          PY
+      - name: Authenticate to Shenzhen ACR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ vars.ACR_REGISTRY }}
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+      - name: Report authentication result
+        run: |
+          echo 'ACR login succeeded from GitHub-hosted Linux. Repository push/pull permission is verified only by the publishing run.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Set up official Buildx
+        if: inputs.operation == 'build-and-push'
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Build and test all images before publishing
+        if: inputs.operation == 'build-and-push'
+        run: bash scripts/acr-images.sh build
+      - name: Publish and verify the complete image set
+        if: inputs.operation == 'build-and-push'
+        run: bash scripts/acr-images.sh publish
+      - name: Retain verified release manifest
+        if: inputs.operation == 'build-and-push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: acr-release-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: release-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Report failure
+        if: failure()
+        run: |
+          echo 'Image preparation failed. See the first failed step. No deployable release manifest is produced on failure; any partially uploaded tags must not be used. No ECS deployment ran.' >> "$GITHUB_STEP_SUMMARY"
