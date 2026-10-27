@@ -3,6 +3,7 @@ import {gradeLanguage,targetGradeBand} from './gradeBands';
 import {gradeStagePolicy} from './youngLearner';
 import type {ChatRequest} from '@/types';
 import { stageInstructions } from './stages';
+import { learningDialogueInstruction } from './learningDialogue';
 import { supportInstructions } from './supportLevels';
 import type { StageId, SupportLevel } from '@/types';
 export function buildInstructions(stage:StageId,level:SupportLevel,intent='chat',request?:ChatRequest) {
@@ -13,5 +14,6 @@ ${intent==='support-change'?'The learner chose a support change. Briefly acknowl
 ${request&&targetGradeBand(request.task)!=='G7+'?gradeStagePolicy(request):stageInstructions[stage]}
 ${request?gradeLanguage[targetGradeBand(request.task)]:''}
 ${supportInstructions[level]}
+${request?learningDialogueInstruction(request):''}
 ${intent==='challenge'?'AI Challenge: Produce ONLY one short claim under 80 words, testable, potentially oversimplified claim specific to the current task. Prefer a claim grounded in the task variables or learner artifacts. This is a claim for critical evaluation, not authoritative advice. Do not reveal its truth or provide a solution.':intent==='evaluate-claim'?'The student is evaluating an AI claim. Do not reveal whether it is correct. Ask how they could test it or what evidence could decide; welcome disagreement.':'If a claim appears in the conversation, do not immediately resolve its truth. Help the learner evaluate evidence.'}`;
 }
