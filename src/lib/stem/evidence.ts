@@ -20,10 +20,9 @@ export function evidenceForStage(task:STEMTask,stage:StageId,text:string,record=
  const patterns:Partial<Record<StageId,RegExp>>={understand:/让|做|至少|要|目标|跑|设计|制作|build|make|goal|need|travel|run|design|find|investigate/i,imagine:/想|猜|觉得|试|把|可能|idea|try|could|think|guess|maybe/i,plan:/先|准备|打算|试|装|换|做|plan|first|will|try|measure|change/i,improve:/改|换|调|下次|把|change|next|adjust|lighter|bigger|smaller|try/i,reflect:/发现|学会|原来|现在|重要|明白|learn|realiz|noticed|found|important|used to/i};return !!patterns[stage]?.test(text);
 }
 
-/** Current learner difficulty pauses progression without erasing earlier evidence.
- * A negated difficulty ("now I understand") is not a block. */
+/** Pause a current difficulty, not a report that a physical part no longer sticks. */
 export function unresolvedDifficulty(text:string){
  const t=text.trim().replace(/以前[^，。;；]*[，。;；]/g,'');
  if(/现在(?:已经)?(?:懂了|明白了|知道了)|现在会了|now I understand|I understand now/i.test(t))return false;
- return /不知道|不懂|没懂|没明白|不理解|什么意思|不会|太难|不确定|\b(?:don['’]?t|do not)\s+(?:really\s+)?(?:know|understand)|no idea|not sure|what does .*mean/i.test(t);
+ return /不知道|不懂|没懂|没明白|不理解|什么意思|我(?:还是|仍然|也)?不会|不会(?:做|弄|说|解释)|太难|不确定|\b(?:don['’]?t|do not)\s+(?:really\s+)?(?:know|understand)|no idea|not sure|what does .*mean/i.test(t);
 }

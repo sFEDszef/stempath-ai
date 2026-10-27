@@ -3,10 +3,12 @@ import {requestReadiness} from './readiness';
 import {coachingObjects} from './concreteCoaching';
 import {unresolvedDifficulty} from './evidence';
 import {taskRubric} from './rubrics';
+import {meaningfulRound} from './progression';
 
 /** These are optional reflection prompts, never scores or progression evidence. */
 export function learningCheck(r:ChatRequest,zh:boolean){
  if(r.intent&&r.intent!=='chat'||unresolvedDifficulty(r.message))return;
+ if(!meaningfulRound(r.task,r.stage,r.message,r.history.filter(m=>m.role==='assistant').at(-1)?.text))return;
  const a=requestReadiness(r),n=a.meaningfulRounds??0;
  if(a.ready||n===0||n%5!==0)return;
  // Never replace a missing real-world attempt with a reflection prompt.
