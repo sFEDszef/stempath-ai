@@ -2,12 +2,15 @@ import type {ChatRequest} from '@/types';
 import {requestReadiness} from './readiness';
 import {coachingObjects} from './concreteCoaching';
 import {unresolvedDifficulty} from './evidence';
+import {taskRubric} from './rubrics';
 
 /** These are optional reflection prompts, never scores or progression evidence. */
 export function learningCheck(r:ChatRequest,zh:boolean){
  if(r.intent&&r.intent!=='chat'||unresolvedDifficulty(r.message))return;
  const a=requestReadiness(r),n=a.meaningfulRounds??0;
  if(a.ready||n===0||n%5!==0)return;
+ // Never replace a missing real-world attempt with a reflection prompt.
+ if(taskRubric(r.task)[r.stage].some(c=>a.missingCriteria?.includes(c.id)&&['ACTUAL_BUILD_ACTION','ACTUAL_TRIAL_1','ACTUAL_TRIAL_2'].includes(c.kind)))return;
  const object=coachingObjects(r).object[zh?0:1];
  return zh?`先用一句话回顾你对${object}的发现，并给自己现在的把握打1–5分（1是还拿不准，5是能向同学解释）。这是自评，不是考试分数；你会怎样说？`:`Summarize what you have found about ${object} in one sentence and rate your confidence from 1–5 (1 means unsure, 5 means able to explain to a friend). This is your self-rating, not a test mark; what would you say?`;
 }
@@ -30,6 +33,8 @@ export function learningDialogueInstruction(r:ChatRequest){
 
 export function confusionRepair(r:ChatRequest,zh:boolean){
  if(!unresolvedDifficulty(r.message))return;
+ const a=requestReadiness(r);
+ if(a.missingCriteria?.length)return;
  const o=coachingObjects(r),object=o.object[zh?0:1],measure=o.measure[zh?0:1];
  const questions={
  understand:[`先只看题目第一句：它要你对${object}做什么？`,`Look only at the task’s first sentence: what does it ask you to do with ${object}?`],
