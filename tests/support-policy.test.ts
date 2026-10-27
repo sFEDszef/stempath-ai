@@ -92,8 +92,8 @@ describe('support policy v2',()=>{
 describe('research trace isolation',()=>{
  const fresh=()=>startSession(base.task,conditionConfig(),1000,{interfaceLanguage:'en',taskLanguage:'en',provider:'demo',model:'deterministic'});
  it('marks v2 sessions, snapshots, response metadata and every export form',()=>{
-  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v6',readinessPolicyVersion:'task-rubric-v1',supportPolicyVersion:'v2'}},1200);
-  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v6',readinessPolicyVersion:'task-rubric-v1',configSnapshot:{supportPolicyVersion:'v2'}});
+  const s=recordEvent(fresh(),'AI_RESPONSE',{coach:{provider:'demo',model:'deterministic',responseMode:'demo',STEMPathVersion:'0.7',promptVersion:'young-learner-v7',readinessPolicyVersion:'task-rubric-v1',supportPolicyVersion:'v2'}},1200);
+  expect(s).toMatchObject({supportPolicyVersion:'v2',promptVersion:'young-learner-v7',readinessPolicyVersion:'task-rubric-v1',configSnapshot:{supportPolicyVersion:'v2'}});
   for(const output of [exportJSON(s),exportCSV(s),exportBundle([s]),combinedCSV([s])])expect(output).toContain('v2');
   expect(educatorReview(s)[0].supportPolicyVersion).toBe('v2');expect(cleanResearch(s).supportPolicyVersion).toBe('v2');
  });

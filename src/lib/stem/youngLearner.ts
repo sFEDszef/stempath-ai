@@ -5,11 +5,12 @@ import {conversationProgress} from './conversationProgress';
 import {rubricQuestion} from './rubricCoaching';
 import {coachingObjects,concreteAcknowledgement} from './concreteCoaching';
 import {taskRubric} from './rubrics';
+import {learningCheck,termExplanation,confusionRepair} from './learningDialogue';
 function concreteHint(request:ChatRequest,zh:boolean){
  const o=coachingObjects(request),i=zh?0:1,object=o.object[i],measure=o.measure[i];
  const hints:Record<StageId,[string,string]>={
  understand:[`先看题目要你对${object}做什么，以及写了什么要求。`,`Look at what the task asks you to do with ${object} and the requirement it gives.`],
- imagine:[`先想${object}上有什么地方可以比较。`,`Think of a part you could compare in ${object}.`],
+ imagine:[`想想改变${object}的一个地方后，${measure}会不会不同。`,`Think about whether changing one part of ${object} could change ${measure}.`],
  plan:[`比较${measure}时，有些东西改变，有些东西要保持一样。`,`When comparing ${measure}, some things change and others stay the same.`],
  build:[`先回想你亲手为${object}做的动作。`,`Recall the work you actually did on ${object}.`],
  test:[`我们要看你实际记下的${measure}，不是猜测。`,`Use ${measure} you actually recorded, rather than a guess.`],
@@ -21,7 +22,7 @@ function concreteSteps(request:ChatRequest,zh:boolean){
  const o=coachingObjects(request),i=zh?0:1,object=o.object[i],measure=o.measure[i];
  const steps:Record<StageId,[string,string,string]>={
  understand:zh?[`看题目要你对${object}做什么`,`找出${object}要达到的要求`,`找出${object}能用的材料或限制`]:[`Find what the task asks about ${object}`,`Find the requirement for ${object}`,`Find a material or rule for ${object}`],
- imagine:zh?[`想一个${object}上可以比较的地方`,`再想一个不同的地方`,`选择自己想先试的想法`]:[`Think of one part of ${object} to compare`,`Think of a different part`,`Choose the idea you want to try first`],
+ imagine:zh?[`想一个会影响${measure}的改变`,`再想一个可能影响结果的改变`,`选择自己想先试的想法`]:[`Think of one part of ${object} to compare`,`Think of a different part`,`Choose the idea you want to try first`],
  plan:zh?[`选${object}要改变的东西`,`找一个每次保持一样的条件`,`决定怎样记录${measure}`]:[`Choose what to change in ${object}`,`Find one condition to keep the same`,`Decide how to record ${measure}`],
  build:zh?[`回想你为${object}亲手做的动作`,`说出动手时实际看到的情况`,`找一个安全检查的地方`]:[`Recall your actual work on ${object}`,`Describe what you actually saw while working`,`Find one safe thing to check`],
  test:zh?[`找出一次真实的${measure}记录`,`找出另一次真实记录`,`对照题目要求看是否达到`]:[`Find one actual record of ${measure}`,`Find another actual record`,`Compare with the task requirement`],
@@ -43,6 +44,12 @@ export function youngReply(request:ChatRequest,zh:boolean){
   return support+ack+' '+(asked?(zh?`等你亲手试过${object}，再回来告诉我实际看到了什么。`:`After trying ${object} yourself, come back and share what you actually saw.`):(request.stage==='build'?(zh?`你已经亲手试过对${object}做这个动作了吗？`:`Have you actually done that work on ${object}?`):(zh?`你已经实际测试或观察过${object}了吗？`:`Have you actually tested or observed ${object} yet?`)));
 
  }
+ const explanation=termExplanation(request,zh);
+ if(explanation)return support+explanation;
+ const repair=confusionRepair(request,zh);
+ if(repair)return support+repair;
+ const check=learningCheck(request,zh);
+ if(check)return support+check;
  const question=rubricQuestion(request,zh),baseHint=concreteHint(request,zh);
  const fact=request.stage==='understand'&&request.level>1?(zh?request.task.translations?.['zh-CN']?.successCriteria?.[0]??request.task.successCriteria?.[0]:request.task.successCriteria?.[0]):undefined;
  const hint=fact?(zh?`题目写着：“${fact}”。 ${baseHint}`:`The task says: “${fact}”. ${baseHint}`):baseHint;

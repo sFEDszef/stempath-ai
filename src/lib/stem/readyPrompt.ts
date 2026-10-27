@@ -8,7 +8,7 @@ export function shouldPromptReady(stage:StageId,active:StageId,completed:StageId
 export function readyPromptCopy(final:boolean,zh:boolean){
  return {
   title:zh?(final?'项目已经可以完成啦！ 🎉':'这一步已经够用了！ 🎉'):(final?'Your project is ready to finish! 🎉':'You’re ready for the next step! 🎉'),
-  body:zh?(final?'你已经完成了最后一步的基本思考。\n点击完成项目，保存这次七阶段探究。':'你已经完成了这一步需要的基本思考。\n点击进入下一阶段，继续你的探究。'):(final?'You have enough for the final step.\nFinish the project to save your seven-stage journey.':'You have enough for this step.\nGo to the next stage to continue your exploration.'),
+  body:zh?(final?'你已经完成了最后一步的基本思考。\n点击完成项目，保存这次七阶段探究。也可以在笔记里写下：我学到了什么、哪里还困惑、下次想试什么。':'你已经完成了这一步需要的基本思考。\n点击进入下一阶段，继续你的探究。'):(final?'You have enough for the final step.\nFinish the project to save your seven-stage journey. You can also use your notebook for a learning journal: what I learned, what confused me, and what I would try next.':'You have enough for this step.\nGo to the next stage to continue your exploration.'),
   advance:zh?(final?'完成项目':'进入下一阶段'):(final?'Finish Project':'Go to the Next Step'),
  };
 }
