@@ -23,6 +23,7 @@ import {stageCheckpoints} from '@/lib/stem/stageCheckpoints';
 import {conditionConfig} from '@/lib/research/config';
 import {startSession,recordEvent} from '@/lib/research/session';
 import {boundedHistory} from '@/lib/stem/context';
+import {apiCoach} from '@/lib/coach';
 let db:DB,lite:PGlite|undefined,pool:Pool|undefined,admin:Account,a:Account,b:Account,accounts:Accounts,projects:Projects;
 function fillStage(p:Awaited<ReturnType<Projects['get']>>,stage:typeof stageIds[number]){
  const turns=dialogue(windTurns[stage],stage);
@@ -38,6 +39,17 @@ beforeAll(async()=>{
 beforeEach(async()=>{vi.stubEnv('SESSION_SECRET','isolated-test-secret-not-a-production-value');vi.stubEnv('PERSISTENCE_MODE','postgres');vi.stubEnv('AUTH_MODE','participant');vi.stubEnv('STUDENT_TASK_MODE','OPEN');await db.query('TRUNCATE users,task_definitions,login_limits CASCADE');accounts=new Accounts(db);projects=new Projects(db);admin=(await accounts.create('ADMIN01','ADMIN','87465193')).account;a=(await accounts.create('P001','STUDENT','482196')).account;b=(await accounts.create('P002','STUDENT','596317')).account;},15000);
 afterEach(()=>vi.unstubAllEnvs());afterAll(async()=>{await lite?.close();await pool?.end();});
 describe('participant accounts and sessions',()=>{
+ it('saves a signed reply after passing through the actual browser API client',async()=>{
+  const p=await projects.create(a,demoTasks[0],'OPEN'),login=await accounts.login(a.participantCode,'482196','receipt-device');
+  const messageId=crypto.randomUUID(),text='我想做一辆靠风推动帆的小车。';
+  vi.stubGlobal('fetch',vi.fn(async(_url:unknown,init:RequestInit)=>guardedCoach(request('chat','POST',JSON.parse(String(init.body)),login.token),async()=>Response.json({text:'你准备怎样判断小车完成了目标？',suggestions:[],mode:'demo'}),false,db)));
+  try {
+   const response=await apiCoach.respond({projectId:p.id,messageId,task:p.task,stage:'understand',level:1,message:text,history:[],artifacts:{},completed:[],intent:'chat'});
+   p.conversations.understand=[{id:messageId,role:'student',text,dialogue:{intent:'chat'}},{id:crypto.randomUUID(),role:'assistant',text:response.text,dialogue:{intent:'chat',successful:true,replyTo:messageId,receipt:response.roundReceipt}}];
+   await projects.save(a,p.id,p,p.serverVersion);
+   expect((await projects.get(a,p.id)).conversations.understand?.map(m=>m.text)).toEqual([text,response.text]);
+  }finally{vi.unstubAllGlobals();}
+ });
  it('uses separate internal UUIDs and case-normalized unique codes',async()=>{expect(a.id).not.toBe(a.participantCode);expect(a.id).not.toBe(b.id);await expect(accounts.create('p001')).rejects.toMatchObject({status:409});});
  it('hashes PINs with independent salts and constant-time verification',async()=>{const h=await hashPIN('482196'),h2=await hashPIN('482196');expect(h).not.toContain('482196');expect(h).not.toBe(h2);expect(await verifyPIN('482196',h)).toBe(true);expect(await verifyPIN('000000',h)).toBe(false);});
  it('rejects invalid PINs and unknown accounts generically',async()=>{await expect(accounts.login('P001','000000','deviceA')).rejects.toMatchObject({status:401});await expect(accounts.login('NOUSER','000000','deviceA')).rejects.toMatchObject({status:401});});
@@ -95,6 +107,22 @@ describe('server support policy migration',()=>{
  }));
 });
 describe('research linkage, privacy and deliberate deletion',()=>{
+ it('lets researchers create students and read research, while students cannot call management APIs',async()=>{
+  const researcher=(await accounts.create('RESEARCH01','RESEARCHER','87465194')).account;
+  const login=await accounts.login(researcher.participantCode,'87465194','research-device');
+  const student=await accounts.login(a.participantCode,'482196','student-device');
+  const created=await platformAPI(request('admin/accounts','POST',{participantCode:'P003',role:'ADMIN'},login.token),['admin','accounts'],db);
+  expect(created.status).toBe(201);expect((await created.json()).account.role).toBe('STUDENT');
+  const p=await projects.create(a,demoTasks[0],'OPEN'),store=new ResearchStore(db);
+  await store.save(a,p.id,startSession(p.task,p.researchConfig),0);
+  const path=['admin','accounts',a.id,'research'];
+  const output=await platformAPI(request(path.join('/'),'GET',undefined,login.token),path,db);
+  expect(output.status).toBe(200);expect((await output.json()).export).toContain(a.participantCode);
+  for(const [method,body] of [['GET',undefined],['POST',{participantCode:'FORGED'}]] as const){
+   expect((await platformAPI(request('admin/accounts',method,body,student.token),['admin','accounts'],db)).status).toBe(403);
+  }
+  expect((await platformAPI(request(path.join('/'),'GET',undefined,student.token),path,db)).status).toBe(403);
+ });
  it('links research to the authenticated user and owned project, excludes PIN/security and raw text when OFF',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN'),research=new ResearchStore(db);let s=startSession(p.task,p.researchConfig);s=recordEvent(s,'MESSAGE_SENT',{messageText:'Private learner phrase'});await research.save(a,p.id,{...s,participantCode:'FORGED',pinHash:'secret',authSession:'secret'},0);const [r]=await db.query('SELECT user_id,project_id FROM research_sessions');expect(r.user_id).toBe(a.id);expect(r.project_id).toBe(p.id);const output=await research.export(admin,a.id);expect(output).toContain('P001');for(const secret of ['Private learner phrase','FORGED','pinHash','authSession'])expect(output).not.toContain(secret);await expect(research.latest(b,p.id)).rejects.toMatchObject({status:404});await expect(research.save(b,p.id,s,0)).rejects.toMatchObject({status:404});});
  it('captures opted-in text only under the server assignment policy',async()=>{const config={...conditionConfig(),storeMessageText:true};await projects.assign(admin,a.id,demoTasks[0],config);const p=await projects.create(a,demoTasks[0],'ASSIGNED'),store=new ResearchStore(db);const s=recordEvent(startSession(p.task,config),'MESSAGE_SENT',{messageText:'Opted-in text'});await store.save(a,p.id,s,0);expect(await store.export(admin,a.id)).toContain('Opted-in text');});
  it('rejects student changes to the assignment research condition or capture policy',async()=>{const p=await projects.create(a,demoTasks[0],'OPEN');const s=startSession(p.task,{...conditionConfig('HIGH_SUPPORT'),storeMessageText:true});await expect(new ResearchStore(db).save(a,p.id,s,0)).rejects.toMatchObject({status:400});});

@@ -27,16 +27,16 @@ export function validateSession(value:unknown):IntegrityReport {
   const initial=s.configSnapshot;
   const policy=supportPolicyVersion(s.supportPolicyVersion);
   require(supportPolicyVersion(initial.supportPolicyVersion)===policy,'Mixed initial support policy');
-  require(['young-learner-v4','young-learner-v5',PROMPT_VERSION].includes(s.promptVersion)===(policy==='v2'),'Prompt/support policy mismatch');
+  require(['young-learner-v4','young-learner-v5','young-learner-v6',PROMPT_VERSION].includes(s.promptVersion)===(policy==='v2'),'Prompt/support policy mismatch');
   require(s.readinessPolicyVersion===initial.readinessPolicyVersion,'Mixed initial readiness policy');
   require((s.promptVersion==='young-learner-v5')===(s.readinessPolicyVersion==='gentle-v1'),'Archived readiness/prompt mismatch');
-  require((s.promptVersion===PROMPT_VERSION)===(s.readinessPolicyVersion===READINESS_POLICY_VERSION),'Prompt/readiness policy mismatch');
+  require((['young-learner-v6',PROMPT_VERSION].includes(s.promptVersion))===(s.readinessPolicyVersion===READINESS_POLICY_VERSION),'Prompt/readiness policy mismatch');
   require(!!initial&&date(initial.timestamp)&&initial.condition===s.condition&&!!initial.provider&&!!initial.model&&initial.promptVersion===s.promptVersion,'Invalid initial configuration');
   require(['en','zh-CN'].includes(initial.interfaceLanguage)&&['en','zh-CN'].includes(initial.taskLanguage),'Invalid initial languages');
   require(['fadingEnabled','escalationEnabled','AIChallengeEnabled','manualSupportChange','messageTextStorage'].every(k=>typeof initial[k as keyof typeof initial]==='boolean'),'Invalid initial policy');
   require(['maxAICallsPerSession','maxTokensPerSession','idleThresholdMs'].every(k=>Number.isSafeInteger(initial[k as keyof typeof initial])&&Number(initial[k as keyof typeof initial])>0),'Invalid initial limits');
   if(initial.provider==='auto'||initial.model==='pending')warnings.push('Initial provider availability was unresolved; use per-response metadata.');
-  require(typeof s.provider==='string'&&s.provider.length>0&&typeof s.model==='string'&&s.model.length>0&&['deepseek-v2','young-learner-v3','young-learner-v4','young-learner-v5',PROMPT_VERSION].includes(s.promptVersion),'Missing provider metadata');
+  require(typeof s.provider==='string'&&s.provider.length>0&&typeof s.model==='string'&&s.model.length>0&&['deepseek-v2','young-learner-v3','young-learner-v4','young-learner-v5','young-learner-v6',PROMPT_VERSION].includes(s.promptVersion),'Missing provider metadata');
   require(Array.isArray(s.tasks)&&s.tasks.length>0&&s.tasks.length<=200,'Missing/oversized task runs');
   const runs=new Map(s.tasks.map(t=>[t.taskId,t]));require(runs.size===s.tasks.length&&runs.has(s.taskId),'Duplicate or missing task run');
   for(const t of s.tasks){require(t.taskId===t.taskRunId&&typeof t.taskDefinitionId==='string'&&!!t.taskDefinitionId&&Number.isSafeInteger(t.taskRevision)&&t.taskRevision>0&&typeof t.taskSnapshotHash==='string'&&/^fnv-[a-f0-9]+-[a-f0-9]+$/.test(t.taskSnapshotHash),'Invalid task trace');require(date(t.startedAt)&&t.completedStages.every(v=>stageIds.includes(v)),'Invalid task metadata');}

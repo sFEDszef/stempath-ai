@@ -29,7 +29,7 @@ export interface ResearchSession {
  interfaceLanguage?:"zh-CN"|"en";taskLanguage?:"zh-CN"|"en";
  schemaVersion:'0.6';stempathVersion:'0.6'|'0.6.2'|'0.7';promptVersion:'deepseek-v2'|'young-learner-v3'|'young-learner-v4'|'young-learner-v5'|'young-learner-v6'|'young-learner-v7';readinessPolicyVersion?:'gentle-v1'|'task-rubric-v1';supportPolicyVersion?:SupportPolicyVersion;provider:string;model:string;taskDefinitionVersion:number;
  participantCode?:string;baselineMeasures:Record<string,number>;outcomeMeasures:Record<string,number>;configSnapshot:ConfigSnapshot;activity:ActivityClock;elapsedDurationMs:number;activeDurationMs:number;usage:{aiCalls:number;inputTokens:number;outputTokens:number;totalTokens:number};
- sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE';condition:Condition;config:ResearchConfig;
+ sessionId:string;startedAt:string;updatedAt:string;completedAt?:string;endedAt?:string;endReason?:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE'|'PROMPT_VERSION_CHANGE';condition:Condition;config:ResearchConfig;
  language:'en'|'zh';currentStage:StageId;supportLevel:SupportLevel;taskId:string;completedStages:StageId[];
  interactionCount:number;events:InteractionEvent[];tasks:TaskRun[];stageTimings:StageTiming[];
  supportHistory:SupportChange[];artifactRevisions:ArtifactRevision[];droppedEvents:number;
@@ -107,7 +107,7 @@ export function snapshot(s:ResearchSession,now=Date.now()):ResearchSession {
 }
 export function sessionSummary(s:ResearchSession){return {stages:s.completedStages.length,revisions:s.artifactRevisions.filter(r=>r.taskId===s.taskId&&r.version>1).length,evidence:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='MESSAGE_SENT'&&e.learnerSignal?.includes('evidence')).length,challenges:s.events.filter(e=>e.taskId===s.taskId&&e.eventType==='AI_CHALLENGE_RESPONSE').length,supportChanges:s.supportHistory.filter(h=>h.taskId===s.taskId&&h.from!==undefined).length};}
 
-export function endSession(s:ResearchSession,reason:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE',now=Date.now()):ResearchSession {
+export function endSession(s:ResearchSession,reason:'RESET'|'CONDITION_CHANGE'|'SUPPORT_POLICY_CHANGE'|'READINESS_POLICY_CHANGE'|'PROMPT_VERSION_CHANGE',now=Date.now()):ResearchSession {
  now=Math.max(now,Date.parse(s.updatedAt));
  if(s.completedAt||s.endedAt)return s;
  return recordEvent({...closeStage(s,now),endedAt:stamp(now),endReason:reason},'SESSION_ENDED',{systemAction:reason},now);
