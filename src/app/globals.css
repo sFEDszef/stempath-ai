@@ -1789,3 +1789,15 @@ body, .chat-panel { background: var(--white); }
 .completion-attribution { border-top: 1px solid #e5e5e5; padding-top: 20px; margin-top: 28px; margin-bottom: 24px; }
 .completion-attribution p { margin: 4px 0; }
 .completion-attribution small { color: #737373; }
+
+/* Researcher data review; student workspace layout is unchanged. */
+.research-session { border-top: 1px solid var(--border); margin-top: 28px; padding-top: 20px; }
+.research-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; }
+.research-metrics div { padding: 16px; background: var(--surface-soft); border-radius: 12px; }
+.research-metrics dt { color: var(--muted); font-size: 14px; }
+.research-metrics dd { margin: 8px 0 0; overflow-wrap: anywhere; }
+.research-review details { border: 1px solid var(--border); border-radius: 12px; margin-top: 16px; padding: 16px; }
+.research-review summary { cursor: pointer; font-weight: 600; }
+.research-transcript { padding-left: 24px; }
+.research-transcript li { padding: 12px; margin: 12px 0; background: var(--surface-soft); border-radius: 8px; }
+.research-transcript p { white-space: pre-wrap; overflow-wrap: anywhere; }

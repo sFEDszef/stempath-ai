@@ -10,7 +10,8 @@ export const apiCoach: CoachService = {
       if (!response.ok) throw new CoachError(typeof body.error==='string'?body.error:'The coach could not respond.',body.retryable!==false,body.diagnostic,body.metadata);
       if(typeof body.text!=='string'||!body.text.trim()||!Array.isArray(body.suggestions)||!body.suggestions.every((s:unknown)=>typeof s==='string')) throw new CoachError('The coach returned an invalid response. Please retry.');
       if(body.mode!=='ai'&&body.mode!=='demo')throw new CoachError('Invalid coach mode.');
-      return {text:body.text,suggestions:body.suggestions,mode:body.mode,metadata:body.metadata,readiness:body.readiness};
+      if(body.roundReceipt!==undefined&&(typeof body.roundReceipt!=='string'||! /^[a-f0-9]{64}$/.test(body.roundReceipt)))throw new CoachError('Invalid coach verification receipt. Please retry.');
+      return {text:body.text,suggestions:body.suggestions,mode:body.mode,metadata:body.metadata,readiness:body.readiness,...(body.roundReceipt?{roundReceipt:body.roundReceipt}:{})};
     }catch(error){if(error instanceof CoachError)throw error;throw new CoachError('Connection interrupted. Please retry. Your message is still here. / 连接中断，请重试。');}
   }
 };
